@@ -1,15 +1,32 @@
 # lean-project
 
-A Claude Code plugin that makes every session cheaper. Claude re-sends the whole conversation on every turn, and loads some files into every session, so tokens go to orientation and old context before any work happens. lean-project keeps that overhead small:
+A Claude Code plugin that makes every session cheaper. Claude re-sends the whole conversation on every turn and loads some files into every session, so tokens go to orientation and old context before any work happens. lean-project keeps that overhead small, and keeps the work organised while it does.
 
-- **New projects** start with a short index, a plan whose phases are gates with acceptance checks, and a 20-line state file. Any fresh session can pick the project up for about 1 to 2k tokens. A loosely described project is grilled first: rounds of numbered questions with a recommended answer each, until every decision is settled. The same grilling sharpens a fuzzy change in an existing project: it checks your answers against the code, challenges vague words, keeps a glossary of the project's own terms, and writes every decision into the plan, with the reasons for the hard-to-reverse ones (adapted from Matt Pocock's [grilling and grill-with-docs skills](https://github.com/mattpocock/skills), MIT).
+## Features
+
+**Planning**
+
+- **New projects** start with a short index, a plan whose phases are gates with acceptance checks, and a 20-line state file. Any fresh session can pick the project up for about 1 to 2k tokens.
+- **Grilling for loose ideas.** A loosely described project is interviewed in rounds: every question that can be asked now, numbered, each with a recommended answer that "yes" accepts. Facts are looked up by a cheap subagent instead of asked; questions only a prototype can answer become prototype tasks. It ends when every decision is settled and you confirm.
+- **Grilling with docs for fuzzy changes** in an existing project: the same interview, checked against the code. Vague or clashing words are challenged, settled terms go into a glossary the moment they settle, and every decision lands in the plan, with the reasons for the hard-to-reverse ones.
 - **Projects already under way** get a plan reconstructed from their code, git tags and docs: released versions become finished phases, current work becomes the open ones, and only real gaps are asked about. Existing file names and doc locations stay, and nothing lands in a folder that ships.
-- **Docs audits** measure what a session pays, remove duplicated rules, slim state files, and add contents tables so Claude opens one section instead of a whole file. Nothing is deleted: trimmed text moves to an archive.
+
+**Reading less**
+
 - **File maps** give an outline with line ranges for large markdown and source files (PHP, JS/TS, Python, Go, Ruby, Rust, Java, Kotlin, C#, Swift, shell), so Claude reads the 40 lines it needs, not 1,000.
-- **Build mode** works through the plan phase by phase and routes tasks by model: Haiku for bulk reading and fixtures, Sonnet for well-specified code, tests and lint fixes, Opus for review and acceptance, and the main session for design. Each task gets a short self-contained brief, and the main session verifies every result.
-- **A shared board** lets parallel subagents and sessions talk while they work: cards move through todo, doing, blocked and done, and agents post one-line facts their siblings need (a contract, a format, a gotcha). It is one append-only file, so parallel writers never overwrite each other, and the lead reads a compact view instead of waiting on replies.
-- **A fresh-session reminder** (a hook) speaks up once the conversation passes a context limit (default 300k tokens): update the state file, then start over from it.
-- **It learns.** Each run records a lesson in your own data folder; a lesson seen twice becomes a local rule that outranks the defaults.
+- **Contents tables** inside long docs, with line ranges, refreshed by one command.
+- **Docs audits** measure what a session pays, remove duplicated rules, slim the index and state file, split growing logs, and add contents tables. Nothing is deleted: trimmed text moves to an archive.
+
+**Building**
+
+- **Build mode** works through the plan phase by phase and routes tasks by model and effort: Haiku for bulk reading and fixtures, Sonnet for well-specified code, tests and lint fixes, Opus for review and acceptance, the main session for design. Each task gets a short self-contained brief, the main session verifies every result, and a failing task climbs effort before it climbs models.
+- **A shared board** lets parallel subagents and sessions talk while they work: cards move through todo, doing, blocked and done, and agents post one-line facts their siblings need (a contract, a format, a gotcha). It is one append-only file, so parallel writers never overwrite each other, and the lead reads a compact view instead of waiting on replies. At each phase gate, lasting notes move into the plan and the board is archived.
+- **Phase gates**: acceptance checks ticked by a fresh reviewer, plus security review, code review and tests before a build is final.
+
+**Session hygiene**
+
+- **A fresh-session reminder** (a hook) speaks up once the conversation passes a context limit: update the state file, then start over from it.
+- **It learns.** Each run records a lesson in your own data folder, including which model passed which kind of task; a lesson seen twice becomes a local rule that outranks the defaults.
 
 ## Install
 
@@ -26,21 +43,32 @@ Requires bash: built in on macOS and Linux, and Git Bash on Windows (which Claud
 
 Ask in plain words, or run the skill directly (`/lean-project:lean-project`):
 
-- "Start a new project for ..." creates the folder, the index, the plan and the state file after one round of questions.
-- "Audit the docs in this project for token use" measures, trims and reports before and after.
-- "Build phase 2 from the plan" routes the phase's tasks across models and checks the phase's gate.
+| Say | What happens |
+|---|---|
+| "Start a new project for ..." | One round of questions (or grilling, if the idea is loose), then the folder, index, plan and state file |
+| "Grill me on this idea" / "Help me pin down this feature" | Rounds of questions until every decision is settled; with code present, a glossary and decisions in the plan |
+| "Take over this project" / "Give this project a plan" | A plan reconstructed from code, git and docs; questions only about the gaps |
+| "Audit the docs in this project for token use" | Measures, trims and reports before and after |
+| "Build phase 2 from the plan" | Splits the phase into tasks, routes them across models, coordinates them on the board, checks the gate |
 
-The `lean-project` command is on Claude's PATH while the plugin is enabled:
+## Commands
 
-```
-lean-project map <file>          # outline with line ranges
-lean-project map <dir> [min]     # files of min+ lines (default 300)
-lean-project toc <file>...       # build or refresh contents tables in markdown
-lean-project cost [dir]          # tokens loaded every session, every doc with flags, duplicated lines
-lean-project board [id]          # shared board: all cards, or one card's history
-lean-project board add|move|note <id> ...
-lean-project selftest
-```
+The `lean-project` command is on Claude's PATH while the plugin is enabled (you can run it too: `bash <plugin folder>/bin/lean-project`).
+
+| Command | What it does |
+|---|---|
+| `lean-project map <file>` | Outline with line ranges: markdown headings, or classes and functions in code |
+| `lean-project map <dir> [min]` | Files of `min`+ lines (default 300), largest first: map those before reading them |
+| `lean-project toc <file>... [--force]` | Build or refresh a contents table between `<!-- toc -->` markers. Files under 80 lines are skipped unless `--force` |
+| `lean-project cost [dir]` | Tokens auto-loaded every session, every doc with flags (`NEEDS TOC`, `STALE TOC`, `STATE FILE OVER 60 LINES`), and lines duplicated across files |
+| `lean-project board` | The shared board: cards by column (doing, blocked, todo, done) and the latest 10 notes |
+| `lean-project board <id>` | One card's full history |
+| `lean-project board add <id> <title>` | Add a card (id: letters, digits, `.`, `_`, `-`, like `T3`) |
+| `lean-project board move <id> <status> [why]` | Status is `todo`, `doing`, `blocked` or `done`; a reason after `blocked` shows on the card |
+| `lean-project board note <id> <text>` | Post a one-line fact for the other tasks |
+| `lean-project selftest` | Check the tool on this machine |
+
+Board environment variables: `LEAN_BOARD` is the board file (default `docs/BOARD.md`; agents always pass an absolute path, since a worktree has its own copy of the docs folder) and `LEAN_AS` is the writer's name (default `lead`).
 
 ## Settings
 
@@ -53,9 +81,29 @@ lean-project selftest
 | Always back up docs before editing | off | On: copy every doc to a dated backup folder before lean-project edits it. Off: back up only when the project is not under version control |
 | Backup folder | `backups` | Where backups go, relative to the project folder |
 
+## What a project gets
+
+```
+<project>/
+├── CLAUDE.md          index: status, folder map, reading rules by task, upkeep, ground rules
+├── docs/
+│   ├── PLAN.md        goal, assumptions A#, decisions D#, sources, phases with gates, risks R#, decision log
+│   ├── HANDOFF.md     state: now, in progress, next
+│   ├── GLOSSARY.md    the project's own terms (once grilling settles one)
+│   ├── BOARD.md       shared board (during a build phase)
+│   └── ARCHIVE.md     replaced text, verbatim (once something is replaced)
+└── <code>/
+```
+
+Projects already under way keep their own names and doc folder. Docs never go inside a folder that ships.
+
 ## Where your data lives
 
 Lessons go to the plugin's data folder (`~/.claude/plugins/data/lean-project-*/LESSONS.md`), which survives plugin updates. Nothing leaves your machine.
+
+## Credits
+
+Grilling is adapted from Matt Pocock's [grilling, grill-with-docs and domain-modeling skills](https://github.com/mattpocock/skills) (MIT; notice in `LICENSE`).
 
 ## License
 

@@ -1,6 +1,6 @@
 ---
 name: lean-project
-description: Run a project with the fewest tokens per session. Start a new project (plan with phase gates, folders, state file), audit or trim CLAUDE.md, handoffs and docs, add contents tables, map large files to read only the needed lines, and build from a plan with tasks routed to Haiku, Sonnet or Opus. Learns from each run.
+description: Run a project with the fewest tokens per session. Start a new project (plan with phase gates, folders, state file), grill a loose idea or fuzzy change into decisions, adopt a project already under way, audit or trim CLAUDE.md, handoffs and docs, add contents tables, map large files to read only the needed lines, and build from a plan with tasks routed to Haiku, Sonnet or Opus and coordinated on a shared board. Learns from each run.
 ---
 
 # lean-project

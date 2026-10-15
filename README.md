@@ -6,6 +6,7 @@ A Claude Code plugin that makes every session cheaper. Claude re-sends the whole
 - **Docs audits** measure what a session pays, remove duplicated rules, slim state files, and add contents tables so Claude opens one section instead of a whole file. Nothing is deleted: trimmed text moves to an archive.
 - **File maps** give an outline with line ranges for large markdown and source files (PHP, JS/TS, Python, Go, Ruby, Rust, Java, Kotlin, C#, Swift, shell), so Claude reads the 40 lines it needs, not 1,000.
 - **Build mode** works through the plan phase by phase and routes tasks by model: Haiku for bulk reading and fixtures, Sonnet for well-specified code, tests and lint fixes, Opus for review and acceptance, and the main session for design. Each task gets a short self-contained brief, and the main session verifies every result.
+- **A shared board** lets parallel subagents and sessions talk while they work: cards move through todo, doing, blocked and done, and agents post one-line facts their siblings need (a contract, a format, a gotcha). It is one append-only file, so parallel writers never overwrite each other, and the lead reads a compact view instead of waiting on replies.
 - **A fresh-session reminder** (a hook) speaks up once the conversation passes a context limit (default 300k tokens): update the state file, then start over from it.
 - **It learns.** Each run records a lesson in your own data folder; a lesson seen twice becomes a local rule that outranks the defaults.
 
@@ -35,6 +36,8 @@ lean-project map <file>          # outline with line ranges
 lean-project map <dir> [min]     # files of min+ lines (default 300)
 lean-project toc <file>...       # build or refresh contents tables in markdown
 lean-project cost [dir]          # tokens loaded every session, every doc with flags, duplicated lines
+lean-project board [id]          # shared board: all cards, or one card's history
+lean-project board add|move|note <id> ...
 lean-project selftest
 ```
 

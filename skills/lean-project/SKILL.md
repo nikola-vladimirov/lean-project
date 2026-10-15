@@ -45,6 +45,7 @@ Read the lessons file if it exists. Its "Local rules" section outranks the defau
 - `lean-project map <dir> [min]`: files of `min`+ lines (default 300).
 - `lean-project toc <file>... [--force]`: build or refresh contents tables in markdown (files under 80 lines are skipped).
 - `lean-project cost [dir]`: auto-loaded tokens, every doc with flags (NEEDS TOC, STALE TOC, STATE FILE OVER 60 LINES), duplicated lines.
+- `lean-project board [id]` and `board add|move|note <id> ...`: shared task board so parallel subagents and sessions exchange facts while they run (how: `BUILD.md`, "Board").
 - `lean-project selftest`.
 
 ## Reading rules (every mode, every project)

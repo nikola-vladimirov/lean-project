@@ -1,8 +1,8 @@
 {
   "name": "lean-project",
   "displayName": "lean-project",
-  "version": "0.1.0",
-  "description": "Spend fewer tokens per session: new-project plans with phase gates, lean docs and state files, file maps for reading only the needed lines, model routing for builds, and a reminder to start a fresh session when the context grows.",
+  "version": "0.2.0",
+  "description": "Spend fewer tokens per session: new-project plans with phase gates, lean docs and state files, file maps for reading only the needed lines, model routing for builds, a shared board so parallel agents exchange facts while they run, and a reminder to start a fresh session when the context grows.",
   "author": {
     "name": "nikola-vladimirov",
     "url": "https://github.com/nikola-vladimirov"

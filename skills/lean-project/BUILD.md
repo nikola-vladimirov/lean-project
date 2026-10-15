@@ -5,13 +5,13 @@ For building a project phase by phase from its plan. The main session is the lea
 ## Before a phase
 
 1. Read the "Local rules" and "Model fit" lines in the lessons file (path in SKILL.md). They override the routing table below.
-2. Read the state file, then only the plan's section for this phase and the sections it names (contents table ranges). The binding rules doc in full only if code will be written.
+2. No phased plan yet (a project already under way): adopt it first (`NEW-PROJECT.md`, "Adopting a project"). Then read the state file, then only the plan's section for this phase and the sections it names (contents table ranges). The binding rules doc in full only if code will be written.
 3. Split the phase into tasks. Each task gets a file set, plan references (line ranges and IDs, not pasted text), an acceptance check (a command or an observable result) and a route from the table. Tasks that touch the same files go to one writer, in order.
 4. Put the task list in the app's task list (`update_plan`), not in a new doc. When two or more tasks are delegated, also add each as a card on the board (below), card ID = task ID.
 
 ## Board: how tasks talk to each other
 
-Subagents cannot see each other, and their replies reach only the lead. The board is the shared channel: one append-only file, `docs/BOARD.md`, read and written only through `lean-project board`, so parallel writers never overwrite each other and readers get a compact view instead of the raw log.
+Subagents cannot see each other, and their replies reach only the lead. The board is the shared channel: one append-only file, `BOARD.md` in the docs folder (SKILL.md), read and written only through `lean-project board`, so parallel writers never overwrite each other and readers get a compact view instead of the raw log.
 
 ```
 lean-project board                      # columns (doing, blocked, todo, done) and the latest 10 notes
@@ -21,7 +21,7 @@ lean-project board move T3 doing        # todo | doing | blocked | done, optiona
 lean-project board note T3 <one line>   # a fact another task needs
 ```
 
-Every call is prefixed with `LEAN_BOARD=<absolute path to docs/BOARD.md> LEAN_AS=<agent name>`. The absolute path matters: a worktree has its own copy of `docs/`, and a note written there reaches no one.
+Every call is prefixed with `LEAN_BOARD=<absolute path to BOARD.md> LEAN_AS=<agent name>`. The absolute path matters: a worktree has its own copy of the docs folder, and a note written there reaches no one.
 
 - **Agents:** read the board at start; move the card to `doing`; post a note the moment you learn something a sibling task depends on (a contract, a format, a gotcha, a file you had to touch outside your set); `blocked <reason>` and stop when you need another card's output; `done` before replying. Read another card (`board <id>`) when your task depends on it.
 - **Lead:** check `lean-project board` instead of waiting on replies; unblock blocked cards (answer with a note, or rerun the task once its dependency is done). Notes are leads, not proof: verify before relying on them.
@@ -79,7 +79,7 @@ Return in under 15 lines: files changed, check result, open questions. No code d
 
 1. An Opus reviewer (or the lead, if it did not write the code) checks the phase's acceptance criteria and ticks them off in the plan.
 2. Before any build is final: security review, code review and tests, using the stack's review and testing skills when installed.
-3. Board: move notes that stay true (contracts, formats, gotchas) into the plan or rules doc, then append the board verbatim to `docs/ARCHIVE.md` under a dated heading and remove `docs/BOARD.md`. The next phase starts with an empty board.
+3. Board: move notes that stay true (contracts, formats, gotchas) into the plan or rules doc, then append the board verbatim to the archive file under a dated heading and remove `BOARD.md`. The next phase starts with an empty board.
 4. Update the state file, refresh the code graph if the project has one, and end the session. The next phase starts fresh from the state file.
 
 ## Cost guards

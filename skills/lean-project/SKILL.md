@@ -11,7 +11,8 @@ One goal: the fewest tokens a session spends to get oriented, stay oriented and 
 
 | The user wants to | Read |
 |---|---|
-| Start a new project, or give an existing folder a plan and state file | `NEW-PROJECT.md` (it sends loose ideas through `GRILL.md`) |
+| Start a new project | `NEW-PROJECT.md` (it sends loose ideas through `GRILL.md`) |
+| Take over a project already under way that has no phased plan | `NEW-PROJECT.md`, "Adopting a project" |
 | Sharpen a fuzzy change, feature or design in an existing project | `GRILL.md` (with docs) |
 | Organize, audit or trim docs, CLAUDE.md, memory or handoffs | `DOCS.md` |
 | Build from the plan (a phase, a feature, a release) | `BUILD.md` |
@@ -20,6 +21,7 @@ One goal: the fewest tokens a session spends to get oriented, stay oriented and 
 
 - Guides and `templates/`: `${CLAUDE_PLUGIN_ROOT}/skills/lean-project/`
 - Lessons: `${CLAUDE_PLUGIN_DATA}/LESSONS.md`
+- **Docs folder:** wherever the project's index keeps its docs (`docs/` for projects this skill started). Plan, state file, glossary, board and archive all go there, under the project's own file names when it has them. Never inside a folder that ships (a plugin, package or theme folder that is zipped or published whole): check the index and the build or ignore rules first.
 - Always back up docs before editing: `${user_config.backup_docs}`. Backup folder: `${user_config.backup_dir}`.
   - `true`: before the first edit, copy every file you will touch to `<project>/<backup folder>/docs-<YYYY-MM-DD>/`.
   - `false`: do that only when the project is not under version control.

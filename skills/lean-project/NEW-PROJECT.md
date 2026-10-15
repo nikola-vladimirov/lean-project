@@ -28,7 +28,7 @@ Unknowns become assumptions and decisions with defaults in the plan, so they nev
 
 - **Docs never ship.** When the deliverable is a folder that ships whole (a WordPress plugin, an npm package, a theme), put the shipped code in a subfolder (`plugin/`, `src/`, `package/`) or exclude `docs/` and `CLAUDE.md` from the build (export-ignore, `files`, `.npmignore`).
 - **Copy the templates** from the `templates/` folder (path in SKILL.md; `INDEX.md` becomes `CLAUDE.md`; `PLAN.md` and `HANDOFF.md` go to `docs/`) and fill them. Delete template lines that do not apply; never leave placeholders.
-- **Extras only when needed:** `templates/extras/RULES.md` once there are more than about 10 binding rules or several contributors; `INTEGRATIONS.md` when the project calls external APIs; `ARCHIVE.md` the first time text is replaced; `docs/GLOSSARY.md` when grilling settles the first term (format in `GRILL.md`).
+- **Extras only when needed:** `templates/extras/RULES.md` once there are more than about 10 binding rules or several contributors; `INTEGRATIONS.md` when the project calls external APIs; `ARCHIVE.md` the first time text is replaced; `GLOSSARY.md` when grilling settles the first term (format in `GRILL.md`).
 
 ## 3. Write the plan
 
@@ -45,3 +45,18 @@ If the folder is not a repository, offer `git init` with a `.gitignore` for the 
 ## 5. Finish
 
 Run `lean-project toc` on docs of 80+ lines and `lean-project cost <project>`. Report the session-start tokens (auto-loaded plus the state file), list the open decisions the user should answer, and record a lesson.
+
+## Adopting a project
+
+For a project already under way: code, history and docs exist, but no phased plan. The plan is reconstructed, not invented, and existing files are never replaced.
+
+1. **Read what exists, cheaply:** the index and state file (whatever names the project uses), `git tag` and `git log --oneline` (a range, not the whole history), the changelog's recent window, and the code through the graph tool or `lean-project map <dir>`. A haiku subagent does any bulk reading and returns a summary.
+2. **Keep the project's layout.** Its index, state file, doc names and docs folder stay (see "Docs folder" in SKILL.md). Only missing pieces are added: the plan from `templates/PLAN.md`, a state file if there is none. An oversized or duplicated index or state file is a job for `DOCS.md`, run after this.
+3. **Write the plan from the evidence:**
+   - Goal, architecture and sources: from the index, readme and code, one line each.
+   - Released versions and finished work: one phase each, every check ticked, with the tag or commit as the evidence. Do not re-verify shipped work unless the user asks.
+   - Work in progress and the state file's "Next": the open phases, each with acceptance checks.
+   - Decisions already visible in code or docs: D# rows marked "decided", with a pointer to where they show.
+   - Rules already in memory or a rules doc stay there; the plan points to them.
+4. **Grill only the gaps** (`GRILL.md`, with docs): what done looks like for the open phases, decisions that contradict each other or the code, and anything the evidence cannot answer. Never ask what the code, git or the docs already say.
+5. **Point the index to the plan** with one line, then finish as in step 5 above.

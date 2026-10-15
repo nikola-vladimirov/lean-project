@@ -41,7 +41,7 @@ Applies when there is code or existing docs to align against, and to any project
 - **Check claims against the code.** When the user says how something works, look. On a contradiction, ask: "The code cancels whole orders, but you said partial cancellation is possible. Which is right?"
 - **Challenge terms.** A word that clashes with the glossary gets called out at once: "The glossary defines cancellation as X, you seem to mean Y." A vague or overloaded word ("account": customer or user?) gets a precise term proposed.
 - **Probe with scenarios.** Invent concrete edge cases that force the boundary between two concepts to be stated.
-- **Glossary, the moment a term settles.** Write it to `docs/GLOSSARY.md` (create it with the first term; use an existing `GLOSSARY.md` or `GLOSSARY-MAP.md` if the repo has one). Project-specific terms only, no general programming concepts, no implementation detail, never a spec or scratch pad:
+- **Glossary, the moment a term settles.** Write it to `GLOSSARY.md` in the docs folder (SKILL.md; create it with the first term; use an existing `GLOSSARY.md` or `GLOSSARY-MAP.md` if the repo has one). Project-specific terms only, no general programming concepts, no implementation detail, never a spec or scratch pad:
 
   ```
   **Order**: a customer's request for one or more products, placed at checkout.
@@ -50,7 +50,7 @@ Applies when there is code or existing docs to align against, and to any project
 
   One or two sentences saying what it is. Pick one word per concept; the rest go under `_Avoid_`. Group under `##` headings when clusters appear.
 - **Decisions, all of them, in the plan.** Every settled answer becomes a D# row in the plan with status "decided"; nothing lives only in the conversation. A decision that is hard to reverse, surprising without context and a real trade-off also gets a decision-log row whose "Why" a future reader can act on, plus the rejected option when someone would otherwise propose it again. If the repo already keeps ADRs (`docs/adr/`), write those decisions there in its format instead and reference the file from the D# row.
-- **The index points to the glossary** once it exists: one line under "Reading" ("Domain terms: `docs/GLOSSARY.md`, grep the term"). Never auto-load it.
+- **The index points to the glossary** once it exists: one line under "Reading" ("Domain terms: `<docs folder>/GLOSSARY.md`, grep the term"). Never auto-load it.
 
 ## Done
 

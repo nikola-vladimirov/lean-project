@@ -1,0 +1,42 @@
+{
+  "name": "lean-project",
+  "displayName": "lean-project",
+  "version": "0.1.0",
+  "description": "Spend fewer tokens per session: new-project plans with phase gates, lean docs and state files, file maps for reading only the needed lines, model routing for builds, and a reminder to start a fresh session when the context grows.",
+  "author": {
+    "name": "nikola-vladimirov",
+    "url": "https://github.com/nikola-vladimirov"
+  },
+  "homepage": "https://github.com/nikola-vladimirov/lean-project",
+  "repository": "https://github.com/nikola-vladimirov/lean-project",
+  "license": "MIT",
+  "keywords": ["tokens", "context", "docs", "planning", "handoff", "productivity"],
+  "userConfig": {
+    "context_limit": {
+      "type": "number",
+      "title": "Context limit (tokens)",
+      "description": "Remind me to update the state file and start a new session once the conversation passes this many tokens.",
+      "default": 300000,
+      "min": 20000
+    },
+    "remind_every": {
+      "type": "number",
+      "title": "Remind again every (tokens)",
+      "description": "After the first reminder, remind again each time the conversation grows by this many tokens.",
+      "default": 50000,
+      "min": 10000
+    },
+    "backup_docs": {
+      "type": "boolean",
+      "title": "Always back up docs before editing",
+      "description": "On: copy every doc to a dated backup folder before lean-project edits it. Off: back up only when the project is not under version control.",
+      "default": false
+    },
+    "backup_dir": {
+      "type": "string",
+      "title": "Backup folder",
+      "description": "Where doc backups go, relative to the project folder.",
+      "default": "backups"
+    }
+  }
+}

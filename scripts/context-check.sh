@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# UserPromptSubmit hook: once the conversation's context passes the limit, nudge (the user and Claude)
+# to update the state file and start a fresh session. Silent below the limit; then once per step.
+# Context size = input + cache tokens of the latest main-thread reply in the transcript.
+input=$(cat)
+field() { printf '%s' "$input" | tr -d '\n' | sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p"; }
+transcript=$(field transcript_path | sed 's/\\\\/\//g')
+session=$(field session_id | tr -cd 'A-Za-z0-9-')
+[ -f "$transcript" ] && [ -n "$session" ] || exit 0
+
+usage=$(tail -n 300 "$transcript" | grep '"usage"' | grep -v '"isSidechain":true' | tail -n 1)
+num() { printf '%s' "$usage" | grep -o "\"$1\":[0-9]*" | head -n 1 | grep -o '[0-9]*$'; }
+ctx=$(( $(num input_tokens || echo 0) + $(num cache_creation_input_tokens || echo 0) + $(num cache_read_input_tokens || echo 0) ))
+
+limit=${CLAUDE_PLUGIN_OPTION_CONTEXT_LIMIT:-300000}
+step=${CLAUDE_PLUGIN_OPTION_REMIND_EVERY:-50000}
+case "$limit$step" in *[!0-9]*|'') exit 0 ;; esac
+[ "$ctx" -ge "$limit" ] && [ "$step" -gt 0 ] || exit 0
+
+state_dir=${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}/lean-project}
+mkdir -p "$state_dir" 2>/dev/null || exit 0
+find "$state_dir" -name 'nudge-*' -mtime +7 -exec rm -f {} + 2>/dev/null
+bucket=$(( (ctx - limit) / step ))
+last=$(cat "$state_dir/nudge-$session" 2>/dev/null || echo -1)
+[ "$bucket" -gt "$last" ] || exit 0
+echo "$bucket" > "$state_dir/nudge-$session"
+
+k=$(( ctx / 1000 ))
+printf '{"systemMessage":"lean-project: this conversation is about %sk tokens, and every turn re-sends all of it. Finish the current step, update the state file, then start a new session from it.","hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"lean-project: context is about %sk tokens (limit %s). Finish the step in hand, update the project state file (Now, In progress, Next) so a fresh session can continue, and tell the user it is a good point to start a new session. Do not begin a new large task in this session."}}\n' "$k" "$k" "$limit"

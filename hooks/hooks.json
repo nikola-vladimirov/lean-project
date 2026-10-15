@@ -1,0 +1,16 @@
+{
+  "description": "Remind to start a fresh session once the conversation passes the context limit.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/context-check.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

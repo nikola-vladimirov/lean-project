@@ -2,9 +2,11 @@
 
 Goal: a project any fresh session can pick up for about 1 to 2k tokens: a short index, a plan with gates, a state file. Nothing else until the project needs it.
 
-## 1. Ask once
+## 1. Ask once, or grill
 
-One round of questions (the AskUserQuestion tool if available), skipping anything already known:
+**Loosely described** (an idea or a one-liner, or the user cannot yet say what done looks like, who it is for, or what the main pieces are): read `GRILL.md` and follow it instead of the single round below. Its settled decisions feed the plan in step 3.
+
+Otherwise, one round of questions (the AskUserQuestion tool if available), skipping anything already known:
 
 - What it is, who it is for, and what done looks like.
 - Stack or platform, and how it ships (zip, package, container, site).
@@ -26,7 +28,7 @@ Unknowns become assumptions and decisions with defaults in the plan, so they nev
 
 - **Docs never ship.** When the deliverable is a folder that ships whole (a WordPress plugin, an npm package, a theme), put the shipped code in a subfolder (`plugin/`, `src/`, `package/`) or exclude `docs/` and `CLAUDE.md` from the build (export-ignore, `files`, `.npmignore`).
 - **Copy the templates** from the `templates/` folder (path in SKILL.md; `INDEX.md` becomes `CLAUDE.md`; `PLAN.md` and `HANDOFF.md` go to `docs/`) and fill them. Delete template lines that do not apply; never leave placeholders.
-- **Extras only when needed:** `templates/extras/RULES.md` once there are more than about 10 binding rules or several contributors; `INTEGRATIONS.md` when the project calls external APIs; `ARCHIVE.md` the first time text is replaced.
+- **Extras only when needed:** `templates/extras/RULES.md` once there are more than about 10 binding rules or several contributors; `INTEGRATIONS.md` when the project calls external APIs; `ARCHIVE.md` the first time text is replaced; `docs/GLOSSARY.md` when grilling settles the first term (format in `GRILL.md`).
 
 ## 3. Write the plan
 

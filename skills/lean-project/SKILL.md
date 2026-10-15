@@ -11,7 +11,8 @@ One goal: the fewest tokens a session spends to get oriented, stay oriented and 
 
 | The user wants to | Read |
 |---|---|
-| Start a new project, or give an existing folder a plan and state file | `NEW-PROJECT.md` |
+| Start a new project, or give an existing folder a plan and state file | `NEW-PROJECT.md` (it sends loose ideas through `GRILL.md`) |
+| Sharpen a fuzzy change, feature or design in an existing project | `GRILL.md` (with docs) |
 | Organize, audit or trim docs, CLAUDE.md, memory or handoffs | `DOCS.md` |
 | Build from the plan (a phase, a feature, a release) | `BUILD.md` |
 

@@ -14,6 +14,8 @@
 #   lean-project frontier [docs/PLAN.md]      decisions to ask now (open, prerequisites decided) and what waits on them
 #   lean-project lesson "<text>" [--project P] [--mode M]   record a lesson; a second sighting becomes a local rule
 #   lean-project lessons                      the local rules and the lessons file
+#   lean-project audit security [dir]    WordPress anti-patterns in PHP and JS (unescaped output, unprepared SQL, missing nonce or capability checks)
+#   lean-project handoff [docs/PLAN.md]  draft of the state file: branch, next tasks, cards in flight (prints only)
 #   lean-project selftest                check the tool on this machine
 set -u
 
@@ -363,6 +365,25 @@ cmd_selftest() {
   [ -n "$(docs_may_ship "$tmp/s")" ] || { echo "FAIL docs ship check missed an npm package"; fail=1; }
   printf 'docs export-ignore\n' > "$tmp/s/.gitattributes"
   [ -z "$(docs_may_ship "$tmp/s")" ] || { echo "FAIL docs ship check ignored export-ignore"; fail=1; }
+  # handoff: open tasks from the plan, and the cards in flight (the latest move wins; a done card is left out)
+  printf '%s\n' '- [ ] write the parser' '- [x] old task' '- [ ] add tests' > "$tmp/HP.md"
+  printf '%s\n' '- 2026-10-16 10:00 | lead | add | H1 | Parser | fast' '- 2026-10-16 10:01 | lead | move | H1 | doing parsing' \
+    '- 2026-10-16 10:02 | lead | add | H2 | API | client' '- 2026-10-16 10:03 | lead | move | H2 | done' > "$tmp/HB.md"
+  hd=$(LEAN_BOARD="$tmp/HB.md" cmd_handoff "$tmp/HP.md")
+  echo "$hd" | grep -q '  - write the parser' || { echo "FAIL handoff missed an open task"; fail=1; }
+  echo "$hd" | grep -q 'old task' && { echo "FAIL handoff listed a done task"; fail=1; }
+  echo "$hd" | grep -q '  H1 \[doing\] Parser | fast' || { echo "FAIL handoff missed a card in flight"; fail=1; }
+  echo "$hd" | grep -q 'H2' && { echo "FAIL handoff listed a done card"; fail=1; }
+  # audit security: each anti-pattern is flagged on its line; escaped output is not
+  mkdir -p "$tmp/sec"
+  printf '%s\n' '<?php' 'echo $_GET["x"];' 'echo esc_html($_GET["x"]);' '$wpdb->query("DELETE FROM t WHERE id = $id");' \
+    'eval($_POST["c"]);' 'add_action("wp_ajax_save", "save");' > "$tmp/sec/a.php"
+  sec=$(cmd_audit_security "$tmp/sec")
+  echo "$sec" | grep -q 'a.php:2: request data echoed without escaping' || { echo "FAIL security missed unescaped output"; fail=1; }
+  echo "$sec" | grep -q 'a.php:3: ' && { echo "FAIL security flagged escaped output"; fail=1; }
+  echo "$sec" | grep -q 'a.php:4: SQL built from a variable' || { echo "FAIL security missed unprepared SQL"; fail=1; }
+  echo "$sec" | grep -q 'a.php:5: eval' || { echo "FAIL security missed eval"; fail=1; }
+  echo "$sec" | grep -q 'a.php: AJAX, admin-post or REST handler' || { echo "FAIL security missed a handler with no check"; fail=1; }
   unset LEAN_BOARD
 
   rm -rf "$tmp"
@@ -653,6 +674,78 @@ docs_may_ship() {
   return 0
 }
 
+# ---- Handoff (state compiler) and security audit ----
+
+# Handoff: a draft of the state file. Branch, the next open tasks in PLAN.md, and the board cards in flight.
+# Prints the draft for review; writes nothing.
+cmd_handoff() {
+  local plan="${1:-docs/PLAN.md}" board="${LEAN_BOARD:-docs/BOARD.md}" branch next flight
+  branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "(not a git repository)")
+  next=""; [ -f "$plan" ] && next=$(grep -m 3 '^- \[ \]' "$plan" | sed 's/^- \[ \] /  - /')
+  flight=""
+  [ -f "$board" ] && flight=$(awk -F ' [|] ' '
+    function rest(   t, k) { t = $5; for (k = 6; k <= NF; k++) t = t " | " $k; return t }
+    /^- [0-9]/ && NF >= 5 {
+      if ($3 == "add") { ttl[$4] = rest(); if (!($4 in st)) st[$4] = "todo" }
+      if ($3 == "move") { s = $5; sub(/ .*/, "", s); st[$4] = s }
+    }
+    END { for (id in st) if (st[id] == "doing" || st[id] == "blocked") printf "  %s [%s] %s\n", id, st[id], ttl[id] }' "$board" | sort)
+  echo "HANDOFF DRAFT: review it, add your gotchas, paste it into the state file (20 lines or fewer)"
+  echo "Branch: $branch"
+  echo "Next tasks:"
+  if [ -n "$next" ]; then echo "$next"; else echo "  (none: no open '- [ ]' task in $plan)"; fi
+  echo "In flight:"
+  if [ -n "$flight" ]; then echo "$flight"; else echo "  (none)"; fi
+  echo "Gotchas: (uncommitted work, workarounds, caveats)"
+}
+
+# Security patterns for WordPress, WooCommerce and Bricks code. Heuristic: each finding is a line to read, not proof.
+SEC_AWK='
+  { sub(/\r$/, ""); line[NR] = $0; all = all $0 "\n" }
+  function out(i, msg) { if (i) printf "%s:%d: %s\n", rel, i, msg; else printf "%s: %s\n", rel, msg }
+  END {
+    for (i = 1; i <= NR; i++) {
+      l = line[i]
+      if (l ~ /^[ \t]*(\/\/|#|\*|\/\*)/) continue
+      if (lang == "js") {
+        if (l ~ /innerHTML[ \t]*=|dangerouslySetInnerHTML/) out(i, "HTML set from script: check the value is escaped or trusted")
+        continue
+      }
+      if (l ~ /(echo|print)[^;]*\$_(GET|POST|REQUEST|COOKIE)/ && l !~ /esc_|wp_kses|absint|intval|sanitize_/) out(i, "request data echoed without escaping")
+      if (l ~ /\$wpdb->(query|get_results|get_var|get_row|get_col)\(/ && l !~ /prepare\(/ && l ~ /\$[a-zA-Z_]/) out(i, "SQL built from a variable: check it goes through $wpdb->prepare()")
+      if (l ~ /(^|[^a-z_])(eval|assert)[ \t]*\(/ || l ~ /unserialize[ \t]*\(/) out(i, "eval, assert or unserialize: never on request or stored data")
+      if (l ~ /(include|require)(_once)?[ \t(].*\$_(GET|POST|REQUEST)/) out(i, "file included from request data")
+      if (l ~ /(shell_exec|exec|system|passthru|popen)[ \t]*\(.*\$_/) out(i, "shell command built from request data")
+      if (l ~ /(update_option|add_option|update_post_meta|update_user_meta|update_term_meta)[ \t]*\(.*\$_(POST|GET|REQUEST)/ && l !~ /sanitize_|absint|intval|wp_kses|esc_/) out(i, "request data stored without sanitize_*")
+      if (l ~ /[^_]wp_redirect[ \t]*\(/ && l ~ /\$_(GET|POST|REQUEST)/) out(i, "redirect to request data: use wp_safe_redirect() and check the target")
+      if (l ~ /__return_true/ && all ~ /register_rest_route/) out(i, "REST route open to everyone (__return_true): fine for public reads only")
+    }
+    if (lang == "php") {
+      if (all ~ /wp_ajax_|admin_post_|register_rest_route/ && all !~ /current_user_can|check_ajax_referer|check_admin_referer|wp_verify_nonce|permission_callback/) out(0, "AJAX, admin-post or REST handler with no capability or nonce check in this file")
+      if (all ~ /\$_FILES/ && all !~ /wp_handle_upload|wp_handle_sideload|wp_check_filetype/) out(0, "uploads read from $_FILES without a WordPress upload check")
+    }
+  }'
+
+# Audit security: read-only scan of PHP and JS for the WordPress anti-patterns in SEC_AWK, one line per finding.
+cmd_audit_security() {
+  local dir="${1:-.}" f rel lang out files
+  [ -d "$dir" ] || die "audit security: $dir is not a folder"
+  dir=$(cd "$dir" && pwd -P)
+  files=$(find_files "$dir" \( -name '*.php' -o -name '*.js' \) | sort)
+  out=$(while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    rel="${f#"$dir"/}"
+    case "$f" in *.php) lang=php ;; *) lang=js ;; esac
+    awk -v rel="$rel" -v lang="$lang" "$SEC_AWK" "$f"
+  done <<EOF
+$files
+EOF
+)
+  [ -n "$out" ] && printf '%s\n' "$out"
+  echo "SECURITY AUDIT: $(printf '%s' "$out" | grep -c .) finding(s) in $(printf '%s\n' "$files" | grep -c .) file(s). Heuristic: read each line, do not trust it blindly. Fixes: skills/lean-project/WORDPRESS.md, Fixes section."
+  return 0
+}
+
 cmd="${1:-}"; [ $# -gt 0 ] && shift
 case "$cmd" in
   map)
@@ -662,9 +755,15 @@ case "$cmd" in
   selftest) cmd_selftest ;;
   board) cmd_board "$@" || exit 1 ;;
   check) [ "${1:-}" = gate ] || die "check: only 'check gate <card id> [files]'"; shift; check_gate "$@" || exit 1 ;;
-  audit) [ "${1:-}" = waste ] || die "audit: only 'audit waste [dir] [--apply]'"; shift; cmd_waste "$@" ;;
+  handoff) cmd_handoff "$@" ;;
+  audit)
+    case "${1:-}" in
+      waste) shift; cmd_waste "$@" ;;
+      security) shift; cmd_audit_security "$@" ;;
+      *) die "audit: 'audit waste [dir] [--apply]' or 'audit security [dir]'" ;;
+    esac ;;
   frontier) cmd_frontier "$@" ;;
   lesson) cmd_lesson "$@" ;;
   lessons) cmd_lessons ;;
-  *) sed -n '5,17p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *) sed -n '5,19p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

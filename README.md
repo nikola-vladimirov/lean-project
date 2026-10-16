@@ -27,6 +27,8 @@ A Claude Code plugin that makes every session cheaper. Claude re-sends the whole
 - **A shared board** lets parallel subagents and sessions talk while they work: cards move through todo, doing, blocked and done, and agents post one-line facts their siblings need (a contract, a format, a gotcha). It is one append-only file, so parallel writers never overwrite each other, and the lead reads a compact view instead of waiting on replies. At each phase gate, lasting notes move into the plan and the board is archived.
 - **Phase gates**: acceptance checks ticked by a fresh reviewer, plus security review, code review and tests before a build is final.
 - **A gate on done.** Moving a card to `done` runs `lean-project check gate`: PHP syntax and, when installed, WordPress coding standards on the card's files. A failure sends the card back to `todo` with the output on the card.
+- **Always on, WordPress aware.** A session-start hook applies the rules to every project. In a WordPress project it points to `skills/lean-project/WORDPRESS.md`: how to read the docs and check changelogs, best practices for plugins, WooCommerce, Bricks and the block editor, and a security checklist with fixes. `lean-project audit security` scans the code for the common anti-patterns.
+- **Handoff draft.** `lean-project handoff` drafts the state file from the branch, the next open tasks and the cards in flight, for review before a reset.
 - **Builder skills on demand.** The 108 Bricks and BricksExtras skills live inside this one skill, in `builder/`. `builder/INDEX.md` routes a task to the one skill it needs, so nothing loads unless a plan step names a Bricks element, template or query. Their generated JSON schema data stays out of the plugin.
 - **Reverse engineering on demand.** The REA guide lives in `reverse/` and loads only for reverse-engineering tasks. REA's MCP server stays off by default (startup cost) and is switched on per folder.
 
@@ -80,6 +82,8 @@ The `lean-project` command is on Claude's PATH while the plugin is enabled (you 
 | `lean-project frontier [docs/PLAN.md]` | The decisions to ask now, and what waits on them |
 | `lean-project lesson "<text>" [--mode M] [--project P]` | Record a lesson; a second sighting becomes a local rule |
 | `lean-project lessons` | Show the local rules and where the lessons file is |
+| `lean-project audit security [dir]` | Read-only scan of PHP and JS for WordPress anti-patterns (unescaped output, unprepared SQL, missing nonce or capability checks, dangerous functions) |
+| `lean-project handoff [docs/PLAN.md]` | Draft of the state file: branch, next tasks, cards in flight (prints only) |
 | `lean-project selftest` | Check the tool on this machine |
 
 Board environment variables: `LEAN_BOARD` is the board file (default `docs/BOARD.md`; agents always pass an absolute path, since a worktree has its own copy of the docs folder) and `LEAN_AS` is the writer's name (default `lead`).

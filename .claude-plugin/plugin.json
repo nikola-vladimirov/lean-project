@@ -1,7 +1,7 @@
 {
   "name": "lean-project",
   "displayName": "lean-project",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Spend fewer tokens per session: new-project plans with phase gates (loose ideas grilled into decisions first), plans reconstructed for projects already under way, grilling with a glossary for fuzzy changes, lean docs and state files, file maps for reading only the needed lines, model routing for builds, a shared board so parallel agents exchange facts while they run, and a reminder to start a fresh session when the context grows.",
   "author": {
     "name": "nikola-vladimirov",

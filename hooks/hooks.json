@@ -1,6 +1,17 @@
 {
-  "description": "Remind to start a fresh session once the conversation passes the context limit.",
+  "description": "lean-project is always on: standing rules at session start (with the WordPress guide for WordPress projects), and a reminder to start a fresh session once the conversation passes the context limit.",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [

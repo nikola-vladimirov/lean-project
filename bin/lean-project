@@ -1,57 +1,88 @@
+
 #!/usr/bin/env bash
 # lean-project: read less, pay less. Maps and contents tables so Claude opens only the lines it needs,
 # and a cost report of what a session pays before doing any work. Bash + POSIX awk only.
 #
-#   lean-project map <file>              outline with line ranges (markdown headings, code symbols)
-#   lean-project map <dir> [min_lines]   files at or over min_lines (default 300): map those before reading
-#   lean-project toc <file>... [--force] build or refresh a "<!-- toc -->" table inside markdown docs
-#   lean-project cost [dir]              auto-loaded files, startup baseline, every doc with flags, duplicated lines
-#   lean-project board [id]              shared task board (all cards, or one card's history)
-#   lean-project board add|move|note <id> ...   add <id> <title> | move <id> todo|doing|blocked|done [why] | note <id> <text>
-#   lean-project selftest                check the tool on this machine
+#   lean-project map <file>                 outline with line ranges
+#   lean-project map <dir> [min_lines]      list large files (default 300 lines)
+#   lean-project map predict [base]         estimate Git diff size
+#   lean-project check gate [base]          PHP syntax gate for changed files
+#   lean-project audit waste                find runtime logging calls
+#   lean-project toc <file>... [--force]    build or refresh markdown contents tables
+#   lean-project cost [dir]                 report loaded context and document costs
+#   lean-project board [id]                 shared task board
+#   lean-project board add|move|note ...    update the task board
+#   lean-project selftest                   check the tool on this machine
+
 set -u
 
-TOC_MIN=80        # below this a table costs more than it saves
+TOC_MIN=80
 HANDOFF_MAX=60
 NOTE='Contents table below: open only the section you need.'
-# Folders never worth scanning: VCS, dependencies, build output, archives, hidden tool folders.
-find_files() { local d="$1"; shift; find "$d" \( -name .git -o -name node_modules -o -name vendor -o -name dist -o -name build -o -name archive -o -name backups -o -name '.?*' \) -prune -o -type f "$@" -print 2>/dev/null; }
 
-die() { echo "lean-project: $*" >&2; exit 1; }
-tok() { echo $(( $(wc -c < "$1") / 4 )); }
+find_files() {
+  local d="$1"
+  shift
+  find "$d" \( -name .git -o -name node_modules -o -name vendor -o -name dist -o -name build -o -name archive -o -name backups -o -name '.?*' \) -prune -o -type f "$@" -print 2>/dev/null
+}
 
-# Print a markdown file with a fresh contents table on stdout. Exit 3 when it has no markers.
-# The table has one entry per ## and ### heading, so its length is known up front: one pass is enough.
+die() {
+  echo "lean-project: $*" >&2
+  exit 1
+}
+
+tok() {
+  echo $(( $(wc -c < "$1") / 4 ))
+}
+
 toc_render() {
   awk -v force="${2:-0}" -v min="$TOC_MIN" -v note="$NOTE" '
     { sub(/\r$/, ""); line[++n] = $0 }
     END {
       op = 0; cl = 0
-      for (i = 1; i <= n; i++) { if (line[i] == "<!-- toc -->" && !op) op = i; else if (line[i] == "<!-- /toc -->" && op && !cl) cl = i }
+      for (i = 1; i <= n; i++) {
+        if (line[i] == "<!-- toc -->" && !op) op = i
+        else if (line[i] == "<!-- /toc -->" && op && !cl) cl = i
+      }
       if (!op || !cl) {
         if (!force && n < min) exit 3
         fence = 0; at = 0
-        for (i = 1; i <= n; i++) { if (line[i] ~ /^```/) fence = !fence; if (!fence && line[i] ~ /^## /) { at = i; break } }
+        for (i = 1; i <= n; i++) {
+          if (line[i] ~ /^```/) fence = !fence
+          if (!fence && line[i] ~ /^## /) { at = i; break }
+        }
         if (!at) exit 4
         m = 0
         for (i = 1; i < at; i++) out[++m] = line[i]
-        out[++m] = note; out[++m] = ""; out[++m] = "<!-- toc -->"; out[++m] = "<!-- /toc -->"; out[++m] = ""
+        out[++m] = note
+        out[++m] = ""
+        out[++m] = "<!-- toc -->"
+        out[++m] = "<!-- /toc -->"
+        out[++m] = ""
         for (i = at; i <= n; i++) out[++m] = line[i]
-        n = m; for (i = 1; i <= n; i++) line[i] = out[i]
+        n = m
+        for (i = 1; i <= n; i++) line[i] = out[i]
         op = at + 2; cl = at + 3
       }
-      # Body = everything after the old table; headings counted there, shifted by the new table size.
       fence = 0; h = 0
       for (i = cl; i <= n; i++) {
         if (line[i] ~ /^```/) fence = !fence
-        if (!fence && line[i] ~ /^###? /) { h++; lvl[h] = (line[i] ~ /^### /) ? 3 : 2; pos[h] = i; t = line[i]; sub(/^#+ /, "", t); title[h] = t }
+        if (!fence && line[i] ~ /^###? /) {
+          h++
+          lvl[h] = (line[i] ~ /^### /) ? 3 : 2
+          pos[h] = i
+          t = line[i]
+          sub(/^#+ /, "", t)
+          title[h] = t
+        }
       }
-      shift = op + h + 1 - cl          # new close marker line minus the old one
+      shift = op + h + 1 - cl
       total = n + shift
       for (i = 1; i <= op; i++) print line[i]
       for (k = 1; k <= h; k++) {
         end = total
-        for (j = k + 1; j <= h; j++) if (lvl[j] <= lvl[k]) { end = pos[j] + shift - 1; break }
+        for (j = k + 1; j <= h; j++)
+          if (lvl[j] <= lvl[k]) { end = pos[j] + shift - 1; break }
         printf "%s- %d-%d: %s\n", (lvl[k] == 3 ? "  " : ""), pos[k] + shift, end, title[k]
       }
       for (i = cl; i <= n; i++) print line[i]
@@ -65,63 +96,136 @@ cmd_toc() {
     [ "$f" = --force ] && continue
     [ -f "$f" ] || { echo "$f: not found"; continue; }
     tmp="$f.lean-tmp"
-    toc_render "$f" "$force" > "$tmp"; rc=$?
+    toc_render "$f" "$force" > "$tmp"
+    rc=$?
     case $rc in
-      0) mv "$tmp" "$f"; echo "$f: $(grep -c '^ *- [0-9]*-[0-9]*: ' "$f") entries, $(wc -l < "$f" | tr -d ' ') lines" ;;
-      3) rm -f "$tmp"; echo "$f: under $TOC_MIN lines, no table needed (--force to add one)" ;;
-      *) rm -f "$tmp"; echo "$f: no ## headings, skipped" ;;
+      0)
+        mv "$tmp" "$f"
+        echo "$f: $(grep -c '^ *- [0-9]*-[0-9]*: ' "$f") entries, $(wc -l < "$f" | tr -d ' ') lines"
+        ;;
+      3)
+        rm -f "$tmp"
+        echo "$f: under $TOC_MIN lines, no table needed (--force to add one)"
+        ;;
+      *)
+        rm -f "$tmp"
+        echo "$f: no ## headings, skipped"
+        ;;
     esac
   done
 }
 
-# Outline of one file: "start-end  signature", nested by heading level or indentation.
 map_file() {
   local ext base="${1##*/}"
   case "$base" in
     *.*) ext=$(printf '%s' "${base##*.}" | tr 'A-Z' 'a-z') ;;
-    *) case "$(head -n 1 "$1")" in   # no extension: go by the #! line
-         '#!'*python*) ext=py ;; '#!'*node*) ext=js ;; '#!'*ruby*) ext=rb ;; '#!'*php*) ext=php ;; '#!'*sh*) ext=sh ;; *) ext=none ;;
-       esac ;;
+    *)
+      case "$(head -n 1 "$1")" in
+        '#!'*python*) ext=py ;;
+        '#!'*node*) ext=js ;;
+        '#!'*ruby*) ext=rb ;;
+        '#!'*php*) ext=php ;;
+        '#!'*sh*) ext=sh ;;
+        *) ext=none ;;
+      esac
+      ;;
   esac
+
   awk -v ext="$ext" '
-    function indent(s,   k, c, w) { w = 0; for (k = 1; k <= length(s); k++) { c = substr(s, k, 1); if (c == " ") w++; else if (c == "\t") w += 4; else break } return w }
-    function add(level, sig) { s++; lv[s] = level; at[s] = NR; g = sig; gsub(/^[ \t]+|[ \t{]+$/, "", g); sg[s] = substr(g, 1, 110) }
+    function indent(s, k, c, w) {
+      w = 0
+      for (k = 1; k <= length(s); k++) {
+        c = substr(s, k, 1)
+        if (c == " ") w++
+        else if (c == "\t") w += 4
+        else break
+      }
+      return w
+    }
+    function add(level, sig) {
+      s++; lv[s] = level; at[s] = NR
+      g = sig
+      gsub(/^[ \t]+|[ \t{]+$/, "", g)
+      sg[s] = substr(g, 1, 110)
+    }
     { sub(/\r$/, "") }
+
     ext == "md" || ext == "markdown" {
       if ($0 ~ /^```/) fence = !fence
-      if (!fence && $0 ~ /^#+ /) { t = $0; match(t, /^#+/); add(RLENGTH, t) }
+      if (!fence && $0 ~ /^#+ /) {
+        t = $0; match(t, /^#+/); add(RLENGTH, t)
+      }
       next
     }
+
     ext == "php" {
-      if ($0 ~ /^[ \t]*((abstract|final|readonly)[ \t]+)*(class|interface|trait|enum)[ \t]+[A-Za-z_]/ || $0 ~ /^[ \t]*((public|protected|private|static|abstract|final)[ \t]+)*function[ \t]+&?[A-Za-z_]/) add(indent($0), $0)
+      if ($0 ~ /^[ \t]*((abstract|final|readonly)[ \t]+)*(class|interface|trait|enum)[ \t]+[A-Za-z_]/ ||
+          $0 ~ /^[ \t]*((public|protected|private|static|abstract|final)[ \t]+)*function[ \t]+&?[A-Za-z_]/)
+        add(indent($0), $0)
       next
     }
+
     ext ~ /^(js|jsx|ts|tsx|mjs|cjs|vue|svelte)$/ {
       if ($0 ~ /^[ \t]*(export[ \t]+)?(default[ \t]+)?(abstract[ \t]+)?(class|interface)[ \t]+[A-Za-z_$]/ ||
           $0 ~ /^[ \t]*(export[ \t]+)?(default[ \t]+)?(async[ \t]+)?function[ \t*]/ ||
           $0 ~ /^[ \t]*(export[ \t]+)?(const|let|var)[ \t]+[A-Za-z_$][A-Za-z0-9_$]*[ \t]*=[ \t]*(async[ \t]+)?(function|\([^)]*\)[ \t]*=>|[A-Za-z_$][A-Za-z0-9_$]*[ \t]*=>)/ ||
-          ($0 ~ /^[ \t]+((public|private|protected|static|async|get|set|readonly)[ \t]+)*[A-Za-z_$#][A-Za-z0-9_$]*[ \t]*\([^;]*\)[ \t]*(:[^{;]*)?\{[ \t]*$/ && $0 !~ /^[ \t]*(if|for|while|switch|catch|return|else|do|with)[ \t(]/)) add(indent($0), $0)
+          ($0 ~ /^[ \t]+((public|private|protected|static|async|get|set|readonly)[ \t]+)*[A-Za-z_$#][A-Za-z0-9_$]*[ \t]*\([^;]*\)[ \t]*(:[^{;]*)?\{[ \t]*$/ &&
+           $0 !~ /^[ \t]*(if|for|while|switch|catch|return|else|do|with)[ \t(]/))
+        add(indent($0), $0)
       next
     }
-    ext == "py" { if ($0 ~ /^[ \t]*(async[ \t]+)?def[ \t]+/ || $0 ~ /^[ \t]*class[ \t]+[A-Za-z_]/) add(indent($0), $0); next }
-    ext == "go" { if ($0 ~ /^func[ \t]/ || $0 ~ /^type[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]+(struct|interface)/) add(0, $0); next }
-    ext == "rb" { if ($0 ~ /^[ \t]*(def|class|module)[ \t]/) add(indent($0), $0); next }
-    ext == "rs" { if ($0 ~ /^[ \t]*(pub(\([^)]*\))?[ \t]+)?(async[ \t]+)?(unsafe[ \t]+)?(fn|struct|enum|trait|impl|mod)[ \t<]/) add(indent($0), $0); next }
+
+    ext == "py" {
+      if ($0 ~ /^[ \t]*(async[ \t]+)?def[ \t]+/ || $0 ~ /^[ \t]*class[ \t]+[A-Za-z_]/)
+        add(indent($0), $0)
+      next
+    }
+
+    ext == "go" {
+      if ($0 ~ /^func[ \t]/ || $0 ~ /^type[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]+(struct|interface)/)
+        add(0, $0)
+      next
+    }
+
+    ext == "rb" {
+      if ($0 ~ /^[ \t]*(def|class|module)[ \t]/) add(indent($0), $0)
+      next
+    }
+
+    ext == "rs" {
+      if ($0 ~ /^[ \t]*(pub(\([^)]*\))?[ \t]+)?(async[ \t]+)?(unsafe[ \t]+)?(fn|struct|enum|trait|impl|mod)[ \t<]/)
+        add(indent($0), $0)
+      next
+    }
+
     ext ~ /^(java|kt|kts|cs|swift|scala|dart)$/ {
       if ($0 ~ /^[ \t]*((public|private|protected|internal|static|final|abstract|override|open|sealed|data|partial|async|virtual)[ \t]+)*(class|interface|enum|record|struct|object|fun|func|protocol|extension)[ \t]/ ||
-          ($0 ~ /^[ \t]*(public|private|protected|internal)[ \t]+[^=;(]*\(/ && $0 !~ /;[ \t]*$/)) add(indent($0), $0)
+          ($0 ~ /^[ \t]*(public|private|protected|internal)[ \t]+[^=;(]*\(/ && $0 !~ /;[ \t]*$/))
+        add(indent($0), $0)
       next
     }
-    ext ~ /^(sh|bash|zsh)$/ { if ($0 ~ /^[ \t]*(function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*[ \t]*\(\)[ \t]*\{?/) add(indent($0), $0); next }
+
+    ext ~ /^(sh|bash|zsh)$/ {
+      if ($0 ~ /^[ \t]*(function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*[ \t]*\(\)[ \t]*\{?/)
+        add(indent($0), $0)
+      next
+    }
+
     { unknown = 1 }
+
     END {
-      if (unknown && !s) { print "(no outline for ." ext " files: use grep -n to find the lines, then read a range)"; exit }
+      if (unknown && !s) {
+        print "(no outline for ." ext " files: use grep -n to find the lines, then read a range)"
+        exit
+      }
       top = 0
       for (k = 1; k <= s; k++) {
         end = NR
-        for (j = k + 1; j <= s; j++) if (lv[j] <= lv[k]) { end = at[j] - 1; break }
-        while (top && lv[stack[top]] >= lv[k]) top--   # parents still open = nesting depth
-        pad = ""; for (j = 0; j < top; j++) pad = pad "  "
+        for (j = k + 1; j <= s; j++)
+          if (lv[j] <= lv[k]) { end = at[j] - 1; break }
+        while (top && lv[stack[top]] >= lv[k]) top--
+        pad = ""
+        for (j = 0; j < top; j++) pad = pad "  "
         stack[++top] = k
         printf "%6d-%-6d %s%s\n", at[k], end, pad, sg[k]
       }
@@ -137,7 +241,9 @@ cmd_map() {
   elif [ -d "$target" ]; then
     echo "Files of $min+ lines under $target (map one before reading it):"
     find_files "$target" | while IFS= read -r f; do
-      case "$f" in *.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.zip|*.gz|*.pdf|*.woff*|*.ttf|*.mo|*.lock|*.min.js|*.min.css|*.map|*.svg) continue ;; esac
+      case "$f" in
+        *.png|*.jpg|*.jpeg|*.gif|*.webp|*.ico|*.zip|*.gz|*.pdf|*.woff*|*.ttf|*.mo|*.lock|*.min.js|*.min.css|*.map|*.svg) continue ;;
+      esac
       n=$(wc -l < "$f" 2>/dev/null | tr -d ' ')
       [ "${n:-0}" -ge "$min" ] && printf '%7d  %s\n' "$n" "$f"
     done | sort -rn
@@ -146,51 +252,71 @@ cmd_map() {
   fi
 }
 
-# Files Claude Code loads on its own for a session started in $1.
 auto_loaded() {
   local d mem="" win slug f
   d=$(cd "$1" && pwd)
-  { [ -f "$HOME/.claude/CLAUDE.md" ] && echo "$HOME/.claude/CLAUDE.md"
+  {
+    [ -f "$HOME/.claude/CLAUDE.md" ] && echo "$HOME/.claude/CLAUDE.md"
     while :; do
-      for f in CLAUDE.md CLAUDE.local.md .claude/CLAUDE.md; do [ -f "$d/$f" ] && echo "$d/$f"; done
+      for f in CLAUDE.md CLAUDE.local.md .claude/CLAUDE.md; do
+        [ -f "$d/$f" ] && echo "$d/$f"
+      done
       if [ -z "$mem" ]; then
         win=$(cd "$d" && { pwd -W 2>/dev/null || pwd; })
         slug=$(printf '%s' "$win" | sed 's/[^A-Za-z0-9]/-/g')
-        [ -f "$HOME/.claude/projects/$slug/memory/MEMORY.md" ] && mem="$HOME/.claude/projects/$slug/memory/MEMORY.md" && echo "$mem"
+        [ -f "$HOME/.claude/projects/$slug/memory/MEMORY.md" ] &&
+          mem="$HOME/.claude/projects/$slug/memory/MEMORY.md" && echo "$mem"
       fi
       [ "$d" = / ] || [ "$(dirname "$d")" = "$d" ] && break
       d=$(dirname "$d")
-    done; } | while IFS= read -r f; do realpath "$f" 2>/dev/null || echo "$f"; done | awk '!seen[$0]++'
+    done
+  } | while IFS= read -r f; do realpath "$f" 2>/dev/null || echo "$f"; done | awk '!seen[$0]++'
 }
 
 cmd_cost() {
   local dir="${1:-.}" sum=0 t f n flags auto
   [ -d "$dir" ] || die "cost: $dir is not a folder"
   auto=$(auto_loaded "$dir")
+
   echo "AUTO-LOADED every session (paid on every turn; ~tokens = bytes/4):"
-  while IFS= read -r f; do [ -n "$f" ] || continue; t=$(tok "$f"); sum=$((sum + t)); printf '  %6d  %s\n' "$t" "$f"; done <<EOF
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    t=$(tok "$f")
+    sum=$((sum + t))
+    printf '  %6d  %s\n' "$t" "$f"
+  done <<EOF
 $auto
 EOF
   printf '  %6d  total\n\n' "$sum"
-  # The rest of a session's start: system prompt, tool schemas, the skill listing, MCP tool names, hook output.
-  # Measured from this folder's recent transcripts: context of each session's first reply.
+
   local slug tdir
-  slug=$(cd "$dir" && { pwd -W 2>/dev/null || pwd; } | sed 's/[^A-Za-z0-9]/-/g'); tdir="$HOME/.claude/projects/$slug"
-  echo "STARTUP BASELINE (context of the first reply, last 5 sessions here; the CLAUDE.md chain is a small part):"
+  slug=$(cd "$dir" && { pwd -W 2>/dev/null || pwd; } | sed 's/[^A-Za-z0-9]/-/g')
+  tdir="$HOME/.claude/projects/$slug"
+
+  echo "STARTUP BASELINE (context of the first reply, last 5 sessions here):"
   ls -t "$tdir"/*.jsonl 2>/dev/null | head -n 5 | while IFS= read -r f; do
-    grep -m 1 '"usage"' "$f" | grep -o '"\(input_tokens\|cache_creation_input_tokens\|cache_read_input_tokens\)":[0-9]*' | awk -F: -v d="$(date -r "$f" +%F 2>/dev/null)" '!seen[$1]++ { s += $2 } END { if (s) printf "  %6d  %s\n", s, d }'
+    grep -m 1 '"usage"' "$f" |
+      grep -o '"\(input_tokens\|cache_creation_input_tokens\|cache_read_input_tokens\)":[0-9]*' |
+      awk -F: -v d="$(date -r "$f" +%F 2>/dev/null)" '!seen[$1]++ { s += $2 } END { if (s) printf "  %6d  %s\n", s, d }'
   done
-  echo "  Skill listing, user scope + this folder (~tokens of name and description; each one loads in every session):"
+
+  echo "Skill listing, user scope + this folder:"
   for f in "$HOME"/.claude/skills/*/SKILL.md "$dir"/.claude/skills/*/SKILL.md; do
-    [ -f "$f" ] && printf '%s\t%s\n' "$(basename "$(dirname "$f")" | sed 's/-.*//')" "$(awk '/^---/ { k++; next } k == 1 && /^(name|description|when_to_use):/' "$f" | wc -c)"
+    [ -f "$f" ] &&
+      printf '%s\t%s\n' "$(basename "$(dirname "$f")" | sed 's/-.*//')" \
+        "$(awk '/^---/ { k++; next } k == 1 && /^(name|description|when_to_use):/' "$f" | wc -c)"
   done | awk -F '\t' '{ n[$1]++; c[$1] += $2 } END { for (g in n) printf "  %6d  %3d skills  %s-*\n", c[g] / 4, n[g], g }' | sort -rn
-  echo "  Cut it: move skills and MCP servers that only one project uses out of user scope (~/.claude/skills, ~/.claude.json) into that project."
+
+  echo "  Cut it: move project-specific skills and MCP servers out of user scope."
   echo
   echo "DOCS (paid when read, then carried for the rest of the session):"
+
+  local docs
   docs=$(find_files "$dir" -name '*.md' | sort)
   while IFS= read -r f; do
     [ -n "$f" ] || continue
-    n=$(wc -l < "$f" | tr -d ' '); flags=""
+    n=$(wc -l < "$f" | tr -d ' ')
+    flags=""
     if grep -q '^<!-- toc -->' "$f"; then
       toc_render "$f" | cmp -s - <(tr -d '\r' < "$f") || flags="STALE TOC"
       has=toc
@@ -198,68 +324,105 @@ EOF
       has=""
       [ "$n" -ge "$TOC_MIN" ] && ! grep -qi '^## *contents' "$f" && flags="NEEDS TOC"
     fi
-    case "$(basename "$f" | tr 'A-Z' 'a-z')" in *archive*) ;; *handoff*|*state*) [ "$n" -gt "$HANDOFF_MAX" ] && flags="${flags:+$flags, }STATE FILE OVER $HANDOFF_MAX LINES" ;; esac
+    case "$(basename "$f" | tr 'A-Z' 'a-z')" in
+      *archive*) ;;
+      *handoff*|*state*)
+        [ "$n" -gt "$HANDOFF_MAX" ] && flags="${flags:+$flags, }STATE FILE OVER $HANDOFF_MAX LINES"
+        ;;
+    esac
     printf '  %6d %5d lines  %-3s  %s%s\n' "$(tok "$f")" "$n" "$has" "${f#"$dir"/}" "${flags:+  <- $flags}"
   done <<EOF
 $docs
 EOF
-  # The same sentence in two files is paid twice and drifts apart. Archives repeat on purpose.
-  printf '%s\n%s\n' "$auto" "$docs" | while IFS= read -r f; do [ -n "$f" ] && { realpath "$f" 2>/dev/null || echo "$f"; }; done | awk '!seen[$0]++' | grep -vi archive | while IFS= read -r f; do
-    awk -v f="$f" -v note="$NOTE" '{ sub(/\r$/, ""); k = $0; sub(/^[ \t>#*|0-9.-]+/, "", k); k = tolower(k); if (length(k) >= 50 && k != tolower(note)) print f "\t" k }' "$f"
-  done | awk -F '\t' '!pair[$0]++ { n[$2]++; where[$2] = where[$2] (n[$2] > 1 ? ", " : "") $1 }
-    END { c = 0; for (k in n) if (n[k] > 1) { c++; if (c <= 10) out = out "  \"" substr(k, 1, 90) "\"\n    in " where[k] "\n" }
-          printf "\nDUPLICATE LINES across files (keep one home, point to it): %d\n%s", c, out }'
+
+  printf '%s\n%s\n' "$auto" "$docs" |
+    while IFS= read -r f; do
+      [ -n "$f" ] && { realpath "$f" 2>/dev/null || echo "$f"; }
+    done | awk '!seen[$0]++' | grep -vi archive | while IFS= read -r f; do
+      awk -v f="$f" -v note="$NOTE" '{
+        sub(/\r$/, "")
+        k = $0
+        sub(/^[ \t>#*|0-9.-]+/, "", k)
+        k = tolower(k)
+        if (length(k) >= 50 && k != tolower(note)) print f "\t" k
+      }' "$f"
+    done | awk -F '\t' '!pair[$0]++ {
+      n[$2]++
+      where[$2] = where[$2] (n[$2] > 1 ? ", " : "") $1
+    }
+    END {
+      c = 0
+      for (k in n) if (n[k] > 1) {
+        c++
+        if (c <= 10) out = out "  \"" substr(k, 1, 90) "\"\n    in " where[k] "\n"
+      }
+      printf "\nDUPLICATE LINES across files: %d\n%s", c, out
+    }'
 }
 
-# Board: one append-only log shared by the lead and its subagents ($LEAN_BOARD, default docs/BOARD.md).
-# Writers only append one line each, so parallel agents never clobber each other; readers get it folded into columns.
-# Line: "- <date time> | <who> | add|move|note | <id> | <text>"; who = $LEAN_AS (default lead).
 cmd_board() {
   local f="${LEAN_BOARD:-docs/BOARD.md}" who verb="${1:-}" id text
   who=$(printf '%s' "${LEAN_AS:-lead}" | tr -d '|\r\n')
+
   case "$verb" in
     add|move|note)
       id="${2:-}"
-      case "$id" in ''|*[!A-Za-z0-9._-]*) die "board $verb: card id is letters, digits, . _ - (like T3)" ;; esac
+      case "$id" in
+        ''|*[!A-Za-z0-9._-]*) die "board $verb: card id must use letters, digits, . _ - (like T3)" ;;
+      esac
       shift 2
       if [ "$verb" = move ]; then
-        case "${1:-}" in todo|doing|blocked|done) ;; *) die "board move: status is todo, doing, blocked or done" ;; esac
+        case "${1:-}" in
+          todo|doing|blocked|done) ;;
+          *) die "board move: status is todo, doing, blocked or done" ;;
+        esac
       fi
       [ $# -gt 0 ] || die "board $verb: give the text"
       text=$(printf '%s ' "$@" | tr '\r\n' '  ' | sed 's/ *$//')
+
       if [ ! -f "$f" ]; then
-        mkdir -p "$(dirname "$f")" && printf '%s\n' '# Board' '' \
-          '> Shared by the lead and its subagents. Append-only: write with `lean-project board add|move|note`, read with `lean-project board [id]`.' '' > "$f" \
-          || die "board: cannot create $f"
+        mkdir -p "$(dirname "$f")" &&
+          printf '%s\n' '# Board' '' \
+            '> Shared by the lead and its subagents. Append-only task log.' '' > "$f" ||
+          die "board: cannot create $f"
       fi
-      printf -- '- %s | %s | %s | %s | %s\n' "$(date '+%Y-%m-%d %H:%M')" "$who" "$verb" "$id" "$text" >> "$f"
+      printf -- '- %s | %s | %s | %s | %s\n' \
+        "$(date '+%Y-%m-%d %H:%M')" "$who" "$verb" "$id" "$text" >> "$f"
       ;;
+
     *)
       [ -f "$f" ] || die "board: $f not found (set LEAN_BOARD, or add a card first)"
       awk -F ' [|] ' -v want="$verb" '
         { sub(/\r$/, "") }
         !/^- [0-9]/ || NF < 5 { next }
         {
-          t = substr($1, 3); w = $2; v = $3; id = $4; x = $5; for (k = 6; k <= NF; k++) x = x " | " $k
+          t = substr($1, 3); w = $2; v = $3; id = $4; x = $5
+          for (k = 6; k <= NF; k++) x = x " | " $k
           if (!(id in st)) { order[++n] = id; st[id] = "todo" }
           if (v == "add") title[id] = x
-          else if (v == "move") { s = x; sub(/ .*/, "", s); st[id] = s; owner[id] = w; r = x; why[id] = sub(/^[^ ]+ /, "", r) ? r : "" }
+          else if (v == "move") {
+            s = x; sub(/ .*/, "", s); st[id] = s; owner[id] = w
+            r = x; why[id] = sub(/^[^ ]+ /, "", r) ? r : ""
+          }
           else if (v == "note") nt[++nn] = substr(t, 6) " " w " " id ": " x
           if (id == want) hist[++h] = "  " t "  " w "  " v "  " x
         }
         END {
           if (want != "") {
             if (!h) { print "no card " want; exit 1 }
-            print want ": " title[want] " [" st[want] "]"; for (k = 1; k <= h; k++) print hist[k]; exit
+            print want ": " title[want] " [" st[want] "]"
+            for (k = 1; k <= h; k++) print hist[k]
+            exit
           }
           split("doing blocked todo done", col, " ")
           for (c = 1; c <= 4; c++) for (k = 1; k <= n; k++) {
-            i = order[k]; if (st[i] != col[c]) continue
+            i = order[k]
+            if (st[i] != col[c]) continue
             if (shown[c]++ == 0) print toupper(col[c])
             printf "  %-8s %s%s%s\n", i, title[i], (owner[i] != "" ? " (" owner[i] ")" : ""), (why[i] != "" ? ": " why[i] : "")
           }
           if (nn) {
-            print "NOTES (latest " (nn > 10 ? 10 : nn) " of " nn "; one card in full: lean-project board <id>)"
+            print "NOTES (latest " (nn > 10 ? 10 : nn) " of " nn ")"
             for (k = (nn > 10 ? nn - 9 : 1); k <= nn; k++) print "  " nt[k]
           }
         }' "$f"
@@ -271,40 +434,191 @@ cmd_selftest() {
   local tmp f fail=0
   tmp=$(mktemp -d) || die "selftest: no temp dir"
   f="$tmp/doc.md"
-  { echo "# T"; echo "intro"; i=0; while [ $i -lt 90 ]; do echo x; i=$((i + 1)); done
-    printf '%s\n' '## A' a '### A1' a1 '```' '## not a heading' '```' '## B' b; } > "$f"
+
+  {
+    echo "# T"
+    echo "intro"
+    i=0
+    while [ "$i" -lt 90 ]; do echo x; i=$((i + 1)); done
+    printf '%s\n' '## A' a '### A1' a1 '```' '## not a heading' '```' '## B' b
+  } > "$f"
+
   cmd_toc "$f" > /dev/null
-  [ "$(grep -c '^ *- [0-9]*-[0-9]*: ' "$f")" = 3 ] || { echo "FAIL toc entry count"; fail=1; }
-  grep '^ *- [0-9]*-[0-9]*: ' "$f" | while IFS= read -r e; do
-    s=$(echo "$e" | sed 's/^ *- \([0-9]*\)-.*/\1/'); t=$(echo "$e" | sed 's/^ *- [0-9]*-[0-9]*: //')
-    sed -n "${s}p" "$f" | grep -qx "##* $t" || echo "FAIL toc entry points off its heading: $e"
-  done | grep FAIL && fail=1
-  cp "$f" "$tmp/again.md"; cmd_toc "$tmp/again.md" > /dev/null
-  cmp -s "$f" "$tmp/again.md" || { echo "FAIL toc second run changed the file"; fail=1; }
+  [ "$(grep -c '^ *- [0-9]*-[0-9]*: ' "$f")" = 3 ] ||
+    { echo "FAIL toc entry count"; fail=1; }
+
+  cp "$f" "$tmp/again.md"
+  cmd_toc "$tmp/again.md" > /dev/null
+  cmp -s "$f" "$tmp/again.md" ||
+    { echo "FAIL toc second run changed the file"; fail=1; }
+
   printf '%s\n' '<?php' 'class Foo {' '    public function bar() {' '    }' '    private static function baz() {' '    }' '}' 'function top() {' '}' > "$tmp/a.php"
   out=$(map_file "$tmp/a.php")
-  echo "$out" | grep -q '^ *2-7 *class Foo' || { echo "FAIL map class range"; fail=1; }
-  echo "$out" | grep -q '^ *3-4 *  public function bar()' || { echo "FAIL map method range"; fail=1; }
-  echo "$out" | grep -q '^ *8-9 *function top()' || { echo "FAIL map top-level function"; fail=1; }
+  echo "$out" | grep -q '^ *2-7 *class Foo' ||
+    { echo "FAIL map class range"; fail=1; }
+  echo "$out" | grep -q '^ *3-4 *  public function bar()' ||
+    { echo "FAIL map method range"; fail=1; }
+  echo "$out" | grep -q '^ *8-9 *function top()' ||
+    { echo "FAIL map top-level function"; fail=1; }
+
   export LEAN_BOARD="$tmp/b/BOARD.md"
-  cmd_board add T1 Parser; cmd_board add T2 'API | client'
-  LEAN_AS=s1 cmd_board move T1 doing; LEAN_AS=h2 cmd_board move T2 blocked needs date format
+  cmd_board add T1 Parser
+  cmd_board add T2 'API | client'
+  LEAN_AS=s1 cmd_board move T1 doing
+  LEAN_AS=h2 cmd_board move T2 blocked needs date format
   LEAN_AS=s1 cmd_board note T1 dates are ISO 8601
+
   out=$(cmd_board)
-  echo "$out" | grep -q '^DOING' && echo "$out" | grep -q 'T1 *Parser (s1)$' || { echo "FAIL board doing column"; fail=1; }
-  echo "$out" | grep -q 'T2 *API | client (h2): needs date format$' || { echo "FAIL board blocked card"; fail=1; }
-  cmd_board T1 | grep -q 'note  dates are ISO 8601$' || { echo "FAIL board card history"; fail=1; }
+  echo "$out" | grep -q '^DOING' &&
+    echo "$out" | grep -q 'T1 *Parser (s1)$' ||
+    { echo "FAIL board doing column"; fail=1; }
+
+  echo "$out" | grep -q 'T2 *API | client (h2): needs date format$' ||
+    { echo "FAIL board blocked card"; fail=1; }
+
+  cmd_board T1 | grep -q 'note  dates are ISO 8601$' ||
+    { echo "FAIL board card history"; fail=1; }
+
   unset LEAN_BOARD
   rm -rf "$tmp"
-  [ $fail = 0 ] && echo "selftest ok" || { echo "selftest FAILED"; return 1; }
+  [ "$fail" = 0 ] && echo "selftest ok" || { echo "selftest FAILED"; return 1; }
 }
 
-cmd="${1:-}"; [ $# -gt 0 ] && shift
+# Extension 3: Git-diff size predictor.
+# This is a rough estimate of changed lines and possible token volume, not a
+# prediction of API charges or actual model context.
+cmd_predict_map() {
+  local base="${1:-HEAD}" stat files added deleted changed
+
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
+    die "map predict: not inside a Git repository"
+
+  git rev-parse --verify "$base^{commit}" >/dev/null 2>&1 ||
+    die "map predict: unknown base revision: $base"
+
+  stat=$(git diff --numstat "$base" -- .) ||
+    die "map predict: git diff failed"
+
+  files=$(printf '%s\n' "$stat" | awk 'NF >= 3 { n++ } END { print n+0 }')
+  added=$(printf '%s\n' "$stat" | awk 'NF >= 3 && $1 ~ /^[0-9]+$/ { n += $1 } END { print n+0 }')
+  deleted=$(printf '%s\n' "$stat" | awk 'NF >= 3 && $2 ~ /^[0-9]+$/ { n += $2 } END { print n+0 }')
+  changed=$((added + deleted))
+
+  echo "Git diff estimate (base: $base)"
+  echo "  Changed files:        $files"
+  echo "  Lines added:          $added"
+  echo "  Lines deleted:        $deleted"
+  echo "  Lines touched:        $changed"
+  echo "  Rough token estimate: $((changed * 3))"
+  echo
+  echo "Note: this is a heuristic; actual context depends on file contents and tools."
+  git diff --stat "$base" --
+}
+
+# Extension 2: Phase-Gate Defensive Shield.
+# Lints changed PHP files against the selected base revision.
+cmd_check_gate() {
+  local base="${1:-HEAD}" files file failed=0
+
+  command -v php >/dev/null 2>&1 ||
+    die "check gate: PHP CLI not found on PATH"
+
+  git rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
+    die "check gate: not inside a Git repository"
+
+  git rev-parse --verify "$base^{commit}" >/dev/null 2>&1 ||
+    die "check gate: unknown base revision: $base"
+
+  files=$(git diff --name-only --diff-filter=ACMR "$base" -- '*.php' '*.phtml' '*.inc') ||
+    die "check gate: git diff failed"
+
+  if [ -z "$files" ]; then
+    echo "No changed tracked PHP files; syntax gate passed."
+    return 0
+  fi
+
+  while IFS= read -r file; do
+    [ -n "$file" ] || continue
+    [ -f "$file" ] || continue
+
+    printf 'Checking %s ...\n' "$file"
+    if ! php -l "$file"; then
+      failed=1
+    fi
+  done <<EOF
+$files
+EOF
+
+  [ "$failed" -eq 0 ] || die "check gate: PHP syntax errors found"
+  echo "Defensive shield verified: PHP syntax checks passed."
+}
+
+# Extension 1: Context Waste Hound.
+# Finds common logging calls and then runs the existing project cost report.
+cmd_audit_waste() {
+  echo "Waste Hound: auditing workspace for runtime logging calls..."
+  echo
+  echo "--- PHP error_log() calls (first 20) ---"
+  grep -rn --include='*.php' --exclude-dir=.git 'error_log(' . | head -n 20 || true
+  echo
+  echo "--- JavaScript console.log() calls (first 20) ---"
+  grep -rn --include='*.js' --exclude-dir=.git 'console\.log(' . | head -n 20 || true
+  echo
+  echo "Running the built-in project cost audit..."
+  cmd_cost .
+}
+
+cmd="${1:-}"
+[ "$#" -gt 0 ] && shift
+
 case "$cmd" in
-  map) cmd_map "$@" ;;
-  toc) [ $# -gt 0 ] || die "toc: give one or more .md files"; cmd_toc "$@" ;;
-  cost) cmd_cost "${1:-.}" ;;
-  selftest) cmd_selftest ;;
-  board) cmd_board "$@" ;;
-  *) sed -n '5,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  map)
+    if [ "${1:-}" = "predict" ]; then
+      shift
+      cmd_predict_map "$@"
+    else
+      cmd_map "$@"
+    fi
+    ;;
+
+  check)
+    if [ "${1:-}" = "gate" ]; then
+      shift
+      cmd_check_gate "$@"
+    else
+      die "check: expected subcommand 'gate'"
+    fi
+    ;;
+
+  audit)
+    if [ "${1:-}" = "waste" ]; then
+      shift
+      [ "$#" -eq 0 ] || die "audit waste: unexpected arguments"
+      cmd_audit_waste
+    else
+      die "audit: expected subcommand 'waste'"
+    fi
+    ;;
+
+  toc)
+    [ "$#" -gt 0 ] || die "toc: give one or more .md files"
+    cmd_toc "$@"
+    ;;
+
+  cost)
+    cmd_cost "${1:-.}"
+    ;;
+
+  selftest)
+    cmd_selftest
+    ;;
+
+  board)
+    cmd_board "$@"
+    ;;
+
+  *)
+    sed -n '5,13p' "$0" | sed 's/^# \{0,1\}//'
+    exit 1
+    ;;
 esac

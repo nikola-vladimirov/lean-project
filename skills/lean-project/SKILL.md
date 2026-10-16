@@ -80,3 +80,22 @@ Append one entry to the lessons file (create it with a "Local rules" section on 
 ## Precedence
 
 The user's own rules (CLAUDE.md, memory) outrank this skill. Never delete content: replaced text moves verbatim to an archive file. Confirm before anything outward-facing (pushing, creating remotes, posting).
+
+## WordPress, Page Builder, and Ecosystem Extensions
+
+When the codebase contains indicators of WordPress, WooCommerce, Bricks Builder, or Block Editor development, the engine automatically unlocks and enforces three extended operations:
+
+### 1. Git-Predictive Dependency Mapping (`lean-project map predict`)
+* Before prompting the user or splitting a phase into tasks, the engine executes a Git history analysis.
+* It scans the last 10 local commits to check which files historically change together (e.g., a Bricks query element causing structural adjustments inside `class-woocommerce-companion.php`).
+* It automatically reads the file maps of *both* associated files in a single pass, preventing broken hooks or silent template failures.
+
+### 2. Phase-Gate Defensive Shield (`lean-project check gate`)
+* When a subagent updates a card to `done` on the append-only `BOARD.md`, the engine intercepts the task closure before it reaches the lead context.
+* It executes localized terminal validation checks (`php -l` and `wpcs` rulesets).
+* If a syntax or escaping check fails, the tool rolls the card status back to `todo`, writes the raw validation error output directly to the card note, and forces the subagent to repair the bug locally.
+
+### 3. Context Waste Hound (`lean-project audit waste`)
+* Scans files for token-wasting code clutter (such as massive boilerplate comments, redundant hook declarations, or dangling `error_log()` entries).
+* Safely evicts this text into `docs/ARCHIVE.md` to lower the baseline token overhead per session message.
+

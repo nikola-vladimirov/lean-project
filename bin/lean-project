@@ -4,10 +4,16 @@
 #
 #   lean-project map <file>              outline with line ranges (markdown headings, code symbols)
 #   lean-project map <dir> [min_lines]   files at or over min_lines (default 300): map those before reading
+#   lean-project map predict <file>      files that changed with <file> in the last 10 commits, with their maps
 #   lean-project toc <file>... [--force] build or refresh a "<!-- toc -->" table inside markdown docs
 #   lean-project cost [dir]              auto-loaded files, startup baseline, every doc with flags, duplicated lines
 #   lean-project board [id]              shared task board (all cards, or one card's history)
-#   lean-project board add|move|note <id> ...   add <id> <title> | move <id> todo|doing|blocked|done [why] | note <id> <text>
+#   lean-project board add|move|note|files <id> ...   add <id> <title> | move <id> todo|doing|blocked|done [why] | note <id> <text> | files <id> <paths>
+#   lean-project check gate <id> [files...]   php syntax and WordPress standards on a card's files; failure sends the card back to todo
+#   lean-project audit waste [dir] [--apply]  comment blocks, debug logs, repeated hooks; dry run unless --apply
+#   lean-project frontier [docs/PLAN.md]      decisions to ask now (open, prerequisites decided) and what waits on them
+#   lean-project lesson "<text>" [--project P] [--mode M]   record a lesson; a second sighting becomes a local rule
+#   lean-project lessons                      the local rules and the lessons file
 #   lean-project selftest                check the tool on this machine
 set -u
 
@@ -209,6 +215,13 @@ EOF
   done | awk -F '\t' '!pair[$0]++ { n[$2]++; where[$2] = where[$2] (n[$2] > 1 ? ", " : "") $1 }
     END { c = 0; for (k in n) if (n[k] > 1) { c++; if (c <= 10) out = out "  \"" substr(k, 1, 90) "\"\n    in " where[k] "\n" }
           printf "\nDUPLICATE LINES across files (keep one home, point to it): %d\n%s", c, out }'
+  if [ -d "$dir/docs" ]; then
+    local why
+    why=$(docs_may_ship "$dir")
+    if [ -n "$why" ]; then
+      printf '\nDOCS MAY SHIP: this project is %s, and docs/ (GLOSSARY.md, PLAN.md, state) would reach users. Exclude docs/ from the build (export-ignore, files or .npmignore), or move the shipped code into a subfolder.\n' "$why"
+    fi
+  fi
 }
 
 # Board: one append-only log shared by the lead and its subagents ($LEAN_BOARD, default docs/BOARD.md).
@@ -218,21 +231,20 @@ cmd_board() {
   local f="${LEAN_BOARD:-docs/BOARD.md}" who verb="${1:-}" id text
   who=$(printf '%s' "${LEAN_AS:-lead}" | tr -d '|\r\n')
   case "$verb" in
-    add|move|note)
+    add|move|note|files)
       id="${2:-}"
       case "$id" in ''|*[!A-Za-z0-9._-]*) die "board $verb: card id is letters, digits, . _ - (like T3)" ;; esac
       shift 2
       if [ "$verb" = move ]; then
         case "${1:-}" in todo|doing|blocked|done) ;; *) die "board move: status is todo, doing, blocked or done" ;; esac
+        if [ "$1" = done ] && [ -z "${LEAN_GATE_SKIP:-}" ]; then
+          check_gate "$id" || return 1
+        fi
       fi
       [ $# -gt 0 ] || die "board $verb: give the text"
+      if [ "$verb" = files ]; then verb=note; set -- "files:" "$@"; fi
       text=$(printf '%s ' "$@" | tr '\r\n' '  ' | sed 's/ *$//')
-      if [ ! -f "$f" ]; then
-        mkdir -p "$(dirname "$f")" && printf '%s\n' '# Board' '' \
-          '> Shared by the lead and its subagents. Append-only: write with `lean-project board add|move|note`, read with `lean-project board [id]`.' '' > "$f" \
-          || die "board: cannot create $f"
-      fi
-      printf -- '- %s | %s | %s | %s | %s\n' "$(date '+%Y-%m-%d %H:%M')" "$who" "$verb" "$id" "$text" >> "$f"
+      board_append "$verb" "$id" "$text"
       ;;
     *)
       [ -f "$f" ] || die "board: $f not found (set LEAN_BOARD, or add a card first)"
@@ -294,17 +306,365 @@ cmd_selftest() {
   echo "$out" | grep -q '^DOING' && echo "$out" | grep -q 'T1 *Parser (s1)$' || { echo "FAIL board doing column"; fail=1; }
   echo "$out" | grep -q 'T2 *API | client (h2): needs date format$' || { echo "FAIL board blocked card"; fail=1; }
   cmd_board T1 | grep -q 'note  dates are ISO 8601$' || { echo "FAIL board card history"; fail=1; }
+  # check gate: a broken PHP file sends its card back to todo; a clean one lets it reach done
+  if command -v php >/dev/null 2>&1; then
+    printf '<?php\necho "ok";\n' > "$tmp/good.php"
+    printf '<?php\necho "ok"\n' > "$tmp/bad.php"
+    cmd_board add T9 Gated > /dev/null
+    cmd_board files T9 "$tmp/bad.php" > /dev/null
+    cmd_board move T9 done > /dev/null 2>&1 && { echo "FAIL gate let a broken file through"; fail=1; }
+    cmd_board T9 | head -n 1 | grep -q '\[todo\]' || { echo "FAIL gate did not roll the card back to todo"; fail=1; }
+    cmd_board T9 | grep -q 'move  *todo gate failed' || { echo "FAIL gate reason not on the card"; fail=1; }
+    cmd_board files T9 "$tmp/good.php" > /dev/null
+    cmd_board move T9 done > /dev/null 2>&1 || { echo "FAIL gate blocked a clean file"; fail=1; }
+    cmd_board T9 | head -n 1 | grep -q '\[done\]' || { echo "FAIL clean card not done"; fail=1; }
+  fi
+  # frontier: open decisions whose prerequisites are settled come first; the others wait
+  printf '%s\n' '## 3. Decisions' '' '| # | Decision | Default | Status |' '|---|---|---|---|' \
+    '| D1 | Storage | sqlite | decided |' '| D2 | Auth provider | none | open |' \
+    '| D3 | Sync model, needs D2 | pull | open |' '| D4 | Theme | light | open |' > "$tmp/PLAN.md"
+  fr=$(cmd_frontier "$tmp/PLAN.md")
+  echo "$fr" | grep -q '^  D2  Auth provider$' || { echo "FAIL frontier missed D2"; fail=1; }
+  echo "$fr" | grep -q '^  D3  waits for D2$' || { echo "FAIL frontier did not hold D3"; fail=1; }
+  # lessons: the second sighting becomes a local rule; the entries move to the archive
+  export LESSONS_FILE="$tmp/lessons/LESSONS.md"
+  cmd_lesson "Haiku passes fixture work at low effort" --mode build > /dev/null
+  grep -q 'Haiku passes' "$LESSONS_FILE" || { echo "FAIL lesson not recorded"; fail=1; }
+  cmd_lesson "Haiku passes fixture work at low effort" --mode build > /dev/null
+  grep -q '^- Haiku passes fixture work at low effort$' "$LESSONS_FILE" || { echo "FAIL repeated lesson not promoted"; fail=1; }
+  grep -q '^- [0-9].*Haiku passes' "$LESSONS_FILE" && { echo "FAIL promoted entries not moved out"; fail=1; }
+  grep -q 'Haiku passes' "$tmp/lessons/LESSONS-ARCHIVE.md" || { echo "FAIL promoted entries not archived"; fail=1; }
+  unset LESSONS_FILE
+  # audit waste: dry run changes nothing; --apply archives the comment block and leaves a pointer
+  git init -q "$tmp/w"
+  { echo '<?php'; i=1; while [ $i -le 9 ]; do echo "// note $i"; i=$((i + 1)); done
+    echo 'echo 1;'; echo 'error_log("x");'; echo 'add_action("init", "f");'; echo 'add_action("init", "f");'; } > "$tmp/w/a.php"
+  rep=$(cmd_waste "$tmp/w")
+  echo "$rep" | grep -q 'a.php:2-10' || { echo "FAIL waste missed the comment block"; fail=1; }
+  echo "$rep" | grep -q 'error_log' || { echo "FAIL waste missed the debug log"; fail=1; }
+  echo "$rep" | grep -q 'repeated hook 2x' || { echo "FAIL waste missed the repeated hook"; fail=1; }
+  [ "$(grep -c '// note' "$tmp/w/a.php")" = 9 ] || { echo "FAIL waste dry run changed the file"; fail=1; }
+  cmd_waste "$tmp/w" --apply > /dev/null
+  grep -q 'note 9' "$tmp/w/docs/ARCHIVE.md" || { echo "FAIL waste did not archive the block"; fail=1; }
+  grep -q 'archived to docs/ARCHIVE.md' "$tmp/w/a.php" || { echo "FAIL waste left no pointer"; fail=1; }
+  grep -q 'error_log' "$tmp/w/a.php" || { echo "FAIL waste removed a debug log"; fail=1; }
+  # predict: a file's partners are the files committed with it
+  if command -v git >/dev/null 2>&1; then
+    git init -q "$tmp/p"
+    (cd "$tmp/p" && echo a > a.php && echo b > b.php && git add -A && git -c user.email=t@t -c user.name=t commit -qm one \
+      && echo a2 >> a.php && git add -A && git -c user.email=t@t -c user.name=t commit -qm two \
+      && echo c > c.php && git add -A && git -c user.email=t@t -c user.name=t commit -qm three)
+    pr=$(cmd_predict "$tmp/p/a.php")
+    echo "$pr" | grep -q 'b.php' || { echo "FAIL predict missed a co-changed file"; fail=1; }
+    echo "$pr" | grep -q '  c.php' && { echo "FAIL predict included an unrelated file"; fail=1; }
+  fi
+  # docs shipping: an npm package ships docs/ unless the build excludes it
+  mkdir -p "$tmp/s/docs"; echo '{"name":"x"}' > "$tmp/s/package.json"
+  [ -n "$(docs_may_ship "$tmp/s")" ] || { echo "FAIL docs ship check missed an npm package"; fail=1; }
+  printf 'docs export-ignore\n' > "$tmp/s/.gitattributes"
+  [ -z "$(docs_may_ship "$tmp/s")" ] || { echo "FAIL docs ship check ignored export-ignore"; fail=1; }
   unset LEAN_BOARD
+
   rm -rf "$tmp"
   [ $fail = 0 ] && echo "selftest ok" || { echo "selftest FAILED"; return 1; }
 }
 
+# ---- Board writes, the gate, predict, waste, lessons, frontier, shipping check ----
+
+# Append one board line: board_append <verb> <id> <text>. Creates the board on first use.
+board_append() {
+  local f="${LEAN_BOARD:-docs/BOARD.md}" who text
+  who=$(printf '%s' "${LEAN_AS:-lead}" | tr -d '|\r\n')
+  text=$(printf '%s' "$3" | tr '\r\n' '  ' | sed 's/ *$//')
+  if [ ! -f "$f" ]; then
+    mkdir -p "$(dirname "$f")" && printf '%s\n' '# Board' '' \
+      '> Shared by the lead and its subagents. Append-only: write with `lean-project board add|move|note|files`, read with `lean-project board [id]`.' '' > "$f" \
+      || die "board: cannot create $f"
+  fi
+  printf -- '- %s | %s | %s | %s | %s\n' "$(date '+%Y-%m-%d %H:%M')" "$who" "$1" "$2" "$text" >> "$f"
+}
+
+# The newest "files:" note on a card (written by: board files <id> <paths>).
+card_files() {
+  local f="${LEAN_BOARD:-docs/BOARD.md}"
+  [ -f "$f" ] || return 0
+  awk -F ' [|] ' -v id="$1" '
+    { sub(/\r$/, "") }
+    /^- [0-9]/ && NF >= 5 && $4 == id && $5 ~ /^files: / { s = substr($5, 8) }
+    END { print s }' "$f"
+}
+
+# Gate: php -l and WordPress coding standards (phpcs) on a card's files.
+# A failure moves the card back to todo and writes the tool output onto the card. Returns 1 on failure.
+# Usage: check_gate <card id> [files...]   (no files: the card's newest "files:" note)
+check_gate() {
+  local id="${1:-}" files f php="" msgs="" out cfg warn="" rc=0
+  [ -n "$id" ] || die "check gate: give the card id"
+  shift
+  files="$*"
+  [ $# -gt 0 ] || files=$(card_files "$id")
+  if [ -z "$files" ]; then echo "gate $id: no files recorded (board files $id <paths>), nothing checked"; return 0; fi
+  for f in $files; do
+    if [ ! -f "$f" ]; then msgs="$msgs missing file $f;"; rc=1; continue; fi
+    case "$f" in *.php) php="$php $f" ;; esac
+  done
+  if [ -n "$php" ]; then
+    if command -v php >/dev/null 2>&1; then
+      for f in $php; do
+        out=$(php -l "$f" 2>&1) || { msgs="$msgs $(printf '%s' "$out" | grep -v '^No syntax errors' | head -n 3 | tr '\n' ' ')"; rc=1; }
+      done
+    else
+      warn="php not installed, syntax not checked"
+    fi
+    if [ $rc = 0 ] && command -v phpcs >/dev/null 2>&1; then
+      cfg=""; [ -f phpcs.xml ] || [ -f phpcs.xml.dist ] || cfg="--standard=${LEAN_WPCS_STANDARD:-WordPress}"
+      out=$(phpcs -n -q $cfg $php 2>&1) || {
+        case "$out" in
+          *"not installed"*) warn="${warn:+$warn; }WordPress coding standard not installed, coding standards not checked" ;;
+          *) msgs="$msgs phpcs: $(printf '%s' "$out" | head -n 3 | tr '\n' ' ')"; rc=1 ;;
+        esac
+      }
+    elif [ $rc = 0 ]; then
+      warn="${warn:+$warn; }phpcs not installed, coding standards not checked"
+    fi
+  fi
+  if [ $rc -ne 0 ]; then
+    msgs=$(printf '%s' "$msgs" | sed 's/^ *//; s/  */ /g')
+    board_append move "$id" "todo gate failed: $(printf '%s' "$msgs" | cut -c1-200)"
+    board_append note "$id" "gate output: $msgs"
+    echo "gate $id: FAILED, card back to todo: $msgs"
+    return 1
+  fi
+  echo "gate $id: passed${warn:+ ($warn)}"
+  return 0
+}
+
+# Predict: the files that changed in the same commits as a file, over the last 10 commits.
+cmd_predict() {
+  local target="${1:-}" dir top abs rel co
+  [ -f "$target" ] || die "map predict: $target not found"
+  echo "$target: $(wc -l < "$target" | tr -d ' ') lines"
+  map_file "$target"
+  dir=$(cd "$(dirname "$target")" && pwd -P)
+  abs="$dir/$(basename "$target")"
+  top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || { echo "(not in a git repository: no history to predict from)"; return 0; }
+  top=$(cd "$top" && pwd -P)
+  rel="${abs#"$top"/}"
+  co=$(git -C "$top" log -n 10 --name-only --format='tformat:@@' 2>/dev/null | awk -v t="$rel" '
+    function flush(   f) { if (has) for (f in cf) if (f != t && f != "") co[f]++; delete cf; has = 0 }
+    /^@@$/ { flush(); next }
+    NF { cf[$0] = 1; if ($0 == t) has = 1 }
+    END { flush(); for (f in co) print co[f] "\t" f }' | sort -rn | head -n 5)
+  if [ -z "$co" ]; then echo "no other file changed with $rel in the last 10 commits"; return 0; fi
+  echo "CHANGED WITH $rel in the last 10 commits (commits, file):"
+  printf '%s\n' "$co" | sed 's/^/  /'
+  printf '%s\n' "$co" | cut -f2 | while IFS= read -r p; do
+    [ -f "$top/$p" ] || continue
+    echo; echo "--- $p ($(wc -l < "$top/$p" | tr -d ' ') lines)"
+    map_file "$top/$p"
+  done
+}
+
+# Waste: comment blocks (8+ lines), debug logs and repeated hooks. Dry run unless --apply, which
+# moves comment blocks verbatim into docs/ARCHIVE.md (git repository only) and leaves a pointer.
+cmd_waste() {
+  local dir="." apply=0 a f rel mark runs s e n arch files dup blocks=0 logs=0 hooks=0
+  for a in "$@"; do case "$a" in --apply) apply=1 ;; *) dir="$a" ;; esac; done
+  [ -d "$dir" ] || die "audit waste: $dir is not a folder"
+  dir=$(cd "$dir" && pwd -P)
+  if [ "$apply" = 1 ] && ! git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    die "audit waste --apply needs a git repository, so every change can be reverted"
+  fi
+  arch="$dir/docs/ARCHIVE.md"
+  files=$(find_files "$dir" \( -name '*.php' -o -name '*.js' -o -name '*.ts' -o -name '*.mjs' -o -name '*.py' -o -name '*.sh' \) | sort)
+  if [ "$apply" = 1 ]; then echo "WASTE in $dir (applying: comment blocks move to docs/ARCHIVE.md)"; else echo "WASTE in $dir (dry run)"; fi
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    rel="${f#"$dir"/}"
+    case "$f" in *.sh|*.py) mark='#' ;; *) mark='//' ;; esac
+    runs=$(awk -v mark="$mark" '
+      function iscomment(s) {
+        if (mark == "//") return s ~ /^[ \t]*\/\//
+        return s ~ /^[ \t]*#/ && s !~ /^[ \t]*#!/ && s !~ /^[ \t]*#\[/
+      }
+      { sub(/\r$/, "") }
+      iscomment($0) { if (!run) start = NR; run++; next }
+      { if (run >= 8) print start, NR - 1, run; run = 0 }
+      END { if (run >= 8) print start, NR, run }' "$f")
+    if [ -n "$runs" ]; then
+      printf '%s\n' "$runs" | while read -r s e n; do printf '  %s:%s-%s  comment block, %s lines\n' "$rel" "$s" "$e" "$n"; done
+      blocks=$((blocks + $(printf '%s\n' "$runs" | grep -c .)))
+      if [ "$apply" = 1 ]; then
+        [ -f "$arch" ] || { mkdir -p "$(dirname "$arch")"; printf '%s\n\n' '# Archive' > "$arch"; }
+        printf '\n## waste %s: %s\n\n' "$(date +%F)" "$rel" >> "$arch"
+        printf '%s\n' "$runs" | sort -k1,1nr | while read -r s e n; do
+          { printf '````\n'; sed -n "${s},${e}p" "$f"; printf '````\n\n'; } >> "$arch"
+          { head -n $((s - 1)) "$f"; printf '%s archived to docs/ARCHIVE.md (%s, lines %s-%s)\n' "$mark" "$rel" "$s" "$e"; tail -n +$((e + 1)) "$f"; } > "$f.lean-tmp" && mv "$f.lean-tmp" "$f"
+        done
+      fi
+    fi
+    case "$f" in *.php)
+      if grep -q 'error_log(' "$f" 2>/dev/null; then
+        grep -n 'error_log(' "$f" | while IFS= read -r l; do printf '  %s:%s  debug log: error_log() (reported, not removed)\n' "$rel" "${l%%:*}"; done
+        logs=$((logs + $(grep -c 'error_log(' "$f")))
+      fi
+      dup=$(awk '
+        { sub(/\r$/, "") }
+        /^[ \t]*add_(action|filter)\(/ { t = $0; sub(/^[ \t]+/, "", t); c[t]++; if (c[t] == 2) order[++m] = t; at[t] = at[t] " " NR }
+        END { for (i = 1; i <= m; i++) print c[order[i]] "\t" order[i] "\t" at[order[i]] }' "$f")
+      if [ -n "$dup" ]; then
+        printf '%s\n' "$dup" | while IFS="$(printf '\t')" read -r n t at; do
+          printf '  %s  repeated hook %sx, lines%s: %s (reported, not removed)\n' "$rel" "$n" "$at" "$t"
+        done
+        hooks=$((hooks + $(printf '%s\n' "$dup" | grep -c .)))
+      fi
+      ;;
+    esac
+  done <<EOF
+$files
+EOF
+  echo "TOTAL: $blocks comment block(s), $logs debug log line(s), $hooks repeated hook(s)"
+  [ "$apply" = 1 ] || [ "$blocks" = 0 ] || echo "Dry run: nothing changed. Run with --apply to move the comment blocks (git reverts them). Debug logs and repeated hooks are never removed: removing them changes behaviour."
+  return 0
+}
+
+# Lessons: the file lives in the plugin data folder (LESSONS_FILE overrides it, for tests).
+lessons_file() {
+  if [ -n "${LESSONS_FILE:-}" ]; then printf '%s\n' "$LESSONS_FILE"; return 0; fi
+  if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then printf '%s\n' "$CLAUDE_PLUGIN_DATA/LESSONS.md"; return 0; fi
+  local g
+  g=$(ls -d "$HOME"/.claude/plugins/data/lean-project-*/ 2>/dev/null | head -n 1)
+  printf '%s\n' "${g:-$HOME/.claude/plugins/data/lean-project/}LESSONS.md"
+}
+
+# Move every entry with this key to LESSONS-ARCHIVE.md (verbatim) and add the rule under "## Local rules" once.
+# Usage: lesson_promote <lessons file> <key> <rule line>
+lesson_promote() {
+  local f="$1" arch
+  arch="$(dirname "$f")/LESSONS-ARCHIVE.md"
+  awk -v key="$2" -v rule="$3" -v arch="$arch" '
+    function norm(s) { s = tolower(s); gsub(/[^a-z0-9]+/, " ", s); sub(/^ /, "", s); sub(/ $/, "", s); return s }
+    function body(s) { sub(/^- [^|]*\| [^|]*\| [^|]*\| /, "", s); return s }
+    FNR == NR { sub(/\r$/, ""); if ($0 ~ /^## /) s1 = $0; if (s1 == "## Local rules" && $0 ~ /^- / && norm($0) == key) have = 1; next }
+    { sub(/\r$/, "") }
+    /^## / { sec = $0 }
+    sec == "## Entries" && /^- [0-9]/ && norm(body($0)) == key { print >> arch; next }
+    { print }
+    /^## Local rules/ && !have && !added { print rule; added = 1 }' "$f" "$f" > "$f.lean-tmp" && mv "$f.lean-tmp" "$f"
+}
+
+lesson_key() { printf '%s\n' "$1" | awk '{ $0 = tolower($0); gsub(/[^a-z0-9]+/, " "); sub(/^ /, ""); sub(/ $/, ""); print }'; }
+
+cmd_lesson() {
+  local text="" mode="-" proj="-" f key n rule lines
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --mode) mode="${2:-}"; shift 2 ;;
+      --project) proj="${2:-}"; shift 2 ;;
+      *) text="${text:+$text }$1"; shift ;;
+    esac
+  done
+  [ -n "$text" ] || die 'lesson: give the text, e.g. lean-project lesson "Haiku passes fixture work at low effort" --mode build'
+  text=$(printf '%s' "$text" | tr '\r\n' '  ' | sed 's/ *$//')
+  f=$(lessons_file)
+  mkdir -p "$(dirname "$f")"
+  [ -f "$f" ] || printf '%s\n' '# Lessons' '' '## Local rules' '' '## Entries' '' > "$f"
+  key=$(lesson_key "$text")
+  n=$(awk -v key="$key" '
+    function norm(s) { s = tolower(s); gsub(/[^a-z0-9]+/, " ", s); sub(/^ /, "", s); sub(/ $/, "", s); return s }
+    function body(s) { sub(/^- [^|]*\| [^|]*\| [^|]*\| /, "", s); return s }
+    { sub(/\r$/, "") }
+    /^## / { sec = $0 }
+    sec == "## Entries" && /^- [0-9]/ && norm(body($0)) == key { c++ }
+    END { print c + 0 }' "$f")
+  rule=$(awk -v key="$key" '
+    function norm(s) { s = tolower(s); gsub(/[^a-z0-9]+/, " ", s); sub(/^ /, "", s); sub(/ $/, "", s); return s }
+    { sub(/\r$/, "") }
+    /^## / { sec = $0 }
+    sec == "## Local rules" && /^- / && norm($0) == key { print 1; exit }' "$f")
+  printf -- '- %s | %s | %s | %s\n' "$(date +%F)" "$proj" "$mode" "$text" >> "$f"
+  n=$((n + 1))
+  if [ "$n" -ge 2 ] || [ "${rule:-0}" = 1 ]; then
+    lesson_promote "$f" "$key" "- $text"
+    echo "promoted to Local rules (seen $n time(s)): $text"
+  else
+    echo "recorded (seen $n time; a second sighting makes it a local rule)"
+  fi
+  lines=$(wc -l < "$f" | tr -d ' ')
+  if [ "$lines" -gt 60 ]; then echo "lessons file is $lines lines: keep it under 60 by promoting or archiving older entries"; fi
+  return 0
+}
+
+cmd_lessons() {
+  local f
+  f=$(lessons_file)
+  echo "LESSONS: $f"
+  if [ ! -f "$f" ]; then echo '(none yet: lean-project lesson "<text>" records one)'; return 0; fi
+  awk '/^## / { p = ($0 == "## Local rules") } p' "$f"
+  echo "entries: $(awk '/^## / { s = $0 } s == "## Entries" && /^- [0-9]/' "$f" | wc -l | tr -d ' '), file: $(wc -l < "$f" | tr -d ' ') lines"
+}
+
+# Frontier: decisions in a plan's table (| D# | decision | default | status |). "needs D2" in the text makes one wait.
+cmd_frontier() {
+  local f="${1:-docs/PLAN.md}"
+  [ -f "$f" ] || die "frontier: $f not found (give the plan path)"
+  awk '
+    { sub(/\r$/, "") }
+    /^\| *D[0-9]+ *\|/ {
+      n = split($0, c, "|")
+      id = c[2]; gsub(/ /, "", id)
+      title = c[3]; gsub(/^ +| +$/, "", title)
+      st = tolower(c[n - 1]); gsub(/ /, "", st)
+      if (!(id in status)) order[++k] = id
+      status[id] = st; text[id] = title
+      rest = $0
+      while (match(rest, /needs[^|]*/)) {
+        seg = substr(rest, RSTART, RLENGTH); rest = substr(rest, RSTART + RLENGTH)
+        while (match(seg, /D[0-9]+/)) { need[id] = need[id] " " substr(seg, RSTART, RLENGTH); seg = substr(seg, RSTART + RLENGTH) }
+      }
+    }
+    END {
+      for (i = 1; i <= k; i++) if (status[order[i]] ~ /^open/) nopen++
+      print "DECIDED " (k - nopen + 0) ", OPEN " (nopen + 0)
+      if (!nopen) { print "FRONTIER empty: every decision is settled"; exit }
+      print "ASK NOW (open, every prerequisite decided):"
+      for (i = 1; i <= k; i++) {
+        id = order[i]; if (status[id] !~ /^open/) continue
+        m = split(need[id], dep, " "); blocked = ""
+        for (j = 1; j <= m; j++) if (!(dep[j] in status) || status[dep[j]] ~ /^open/) blocked = blocked " " dep[j]
+        if (blocked == "") { print "  " id "  " text[id]; front++ }
+        else waiting[++w] = "  " id "  waits for" blocked
+      }
+      if (w) { print "WAITING:"; for (j = 1; j <= w; j++) print waiting[j] }
+      if (!front) print "STUCK: every open decision waits on another; check the needs references for cycles or unknown IDs"
+    }' "$f"
+}
+
+# Why a project folder would ship its docs/ in a build, or nothing when the build excludes docs/.
+docs_may_ship() {
+  local d="$1" p
+  [ -f "$d/.gitattributes" ] && grep -q 'docs.*export-ignore' "$d/.gitattributes" && return 0
+  [ -f "$d/.npmignore" ] && grep -q '^/\{0,1\}docs/\{0,1\}$' "$d/.npmignore" && return 0
+  if [ -f "$d/package.json" ] && grep -q '"files"' "$d/package.json" && ! grep -q '"docs' "$d/package.json"; then return 0; fi
+  p=$(grep -l 'Plugin Name:' "$d"/*.php 2>/dev/null | head -n 1)
+  [ -n "$p" ] && { echo "a WordPress plugin ($(basename "$p"))"; return 0; }
+  grep -q 'Theme Name:' "$d/style.css" 2>/dev/null && { echo "a WordPress theme"; return 0; }
+  [ -f "$d/package.json" ] && ! grep -q '"private": *true' "$d/package.json" && echo "an npm package (package.json is not private)"
+  return 0
+}
+
 cmd="${1:-}"; [ $# -gt 0 ] && shift
 case "$cmd" in
-  map) cmd_map "$@" ;;
+  map)
+    if [ "${1:-}" = predict ]; then shift; [ $# -gt 0 ] || die "map predict: give a file"; cmd_predict "$@"; else cmd_map "$@"; fi ;;
   toc) [ $# -gt 0 ] || die "toc: give one or more .md files"; cmd_toc "$@" ;;
   cost) cmd_cost "${1:-.}" ;;
   selftest) cmd_selftest ;;
-  board) cmd_board "$@" ;;
-  *) sed -n '5,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  board) cmd_board "$@" || exit 1 ;;
+  check) [ "${1:-}" = gate ] || die "check: only 'check gate <card id> [files]'"; shift; check_gate "$@" || exit 1 ;;
+  audit) [ "${1:-}" = waste ] || die "audit: only 'audit waste [dir] [--apply]'"; shift; cmd_waste "$@" ;;
+  frontier) cmd_frontier "$@" ;;
+  lesson) cmd_lesson "$@" ;;
+  lessons) cmd_lessons ;;
+  *) sed -n '5,17p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac

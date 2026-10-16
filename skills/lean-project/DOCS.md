@@ -11,7 +11,8 @@ Goal: the smallest auto-load and session-start cost with no information lost.
 7. **Contents tables:** `lean-project toc` on every doc of 80+ lines. Headings specific enough that the table alone says which range to open; split sections over about 150 lines into `###` parts. Stable IDs (R1, P-01, D1) on rules, features and decisions so a grep lands on one line.
 8. **Logs that keep growing** (changelogs, activity logs): keep the recent window (the file's own rule, else 3 months) and move older entries verbatim to `<name>-archive.md`, with a pointer line each way. Check that the line counts add up.
 9. **Never delete content.** Trimmed text moves verbatim to an archive file (with a table, never read whole). Empty placeholders can go.
-10. **Measure again** and report:
+10. **Code waste** (code projects): `lean-project audit waste <project>` for a dry run, then `--apply` for the comment blocks once the list looks right (a git repository is required, so each change can be reverted). Debug logs and repeated hooks are reported for a human decision, never removed by the tool.
+11. **Measure again** and report:
 
 ```
 ## lean-project docs: <project>

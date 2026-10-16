@@ -33,7 +33,7 @@ Unknowns become assumptions and decisions with defaults in the plan, so they nev
 ## 3. Write the plan
 
 - Keep it as short as the project allows. Stable IDs on everything (A1, D1, P1, R1) so a grep finds one line.
-- Every decision gets a default, so work can start before the user answers.
+- Every decision gets a default, so work can start before the user answers. Status is `open` or `decided`. Write `needs D<n>` in a decision's text when it waits on another; `lean-project frontier docs/PLAN.md` then lists what to ask next.
 - **Phases are gates.** Each phase lists its scope and acceptance checks that a command or a person can verify. The next phase starts only when every check is ticked in the plan.
 - **Phase 0 verifies unknowns** (API behaviour, limits, data formats, access) when the project depends on anything external. Facts from unofficial sources are leads until checked.
 - Optional per phase: which parts go to which model (see `BUILD.md`).

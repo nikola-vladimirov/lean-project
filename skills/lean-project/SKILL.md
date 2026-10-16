@@ -58,6 +58,11 @@ Read the lessons file if it exists. Its "Local rules" section outranks the defau
 - `lean-project toc <file>... [--force]`: build or refresh contents tables in markdown (files under 80 lines are skipped).
 - `lean-project cost [dir]`: auto-loaded tokens, every doc with flags (NEEDS TOC, STALE TOC, STATE FILE OVER 60 LINES), duplicated lines.
 - `lean-project board [id]` and `board add|move|note <id> ...`: shared task board so parallel subagents and sessions exchange facts while they run (how: `BUILD.md`, "Board").
+- `lean-project map predict <file>`: the files that changed in the same commits as `<file>` over the last 10 commits, with their maps. Read those together before editing one of them.
+- `lean-project check gate <card> [files]`: `php -l` and, when installed, `phpcs` with the WordPress standard (or the project's own `phpcs.xml`). `board move <card> done` runs it on the card's files (`board files <card> <paths>` records them). A failure moves the card back to `todo` with the output on the card.
+- `lean-project audit waste [dir] [--apply]`: comment blocks of 8+ lines, debug `error_log()` calls and repeated hooks. Dry run by default. `--apply` (git repositories only) moves comment blocks verbatim into `docs/ARCHIVE.md`; debug logs and repeated hooks are reported only, since removing them changes behaviour.
+- `lean-project frontier [docs/PLAN.md]`: the decisions to ask next (status `open`, every `needs D#` already decided) and what waits on them.
+- `lean-project lesson "<text>" [--mode M] [--project P]` and `lean-project lessons`: record a lesson; the second sighting of the same text becomes a line under "Local rules" and its entries move to `LESSONS-ARCHIVE.md`.
 - `lean-project selftest`.
 
 ## Reading rules (every mode, every project)
@@ -75,7 +80,7 @@ Read the lessons file if it exists. Its "Local rules" section outranks the defau
 
 ## After any mode: improve
 
-Append one entry to the lessons file (create it with a "Local rules" section on top and an "Entries" section below): date, project, mode, before and after tokens where measured, what saved the most, what in these guides was wrong or wasted effort. A lesson seen twice becomes a line in "Local rules" and its entries go. Keep the file under 60 lines. If a lesson would help every user, offer to draft an issue for the plugin's repository, and post only if the user says yes.
+Record it with `lean-project lesson "<text>" --mode <mode> --project <name>`: include before and after tokens where measured, what saved the most, and what in these guides was wrong or wasted effort. The command creates the file (a "Local rules" section on top, "Entries" below), and a lesson seen twice becomes a line in "Local rules" with its entries moved to `LESSONS-ARCHIVE.md`. Keep the file under 60 lines; the command warns when it passes that. If a lesson would help every user, offer to draft an issue for the plugin's repository, and post only if the user says yes.
 
 ## Precedence
 
@@ -83,7 +88,7 @@ The user's own rules (CLAUDE.md, memory) outrank this skill. Never delete conten
 
 ## WordPress, Page Builder, and Ecosystem Extensions
 
-When the codebase contains indicators of WordPress, WooCommerce, Bricks Builder, or Block Editor development, the engine automatically unlocks and enforces three extended operations:
+For WordPress, WooCommerce, Bricks Builder, or Block Editor code, three operations apply. None needs setup: `map predict` and `audit waste` run on demand, and the gate runs when a card moves to `done` (`LEAN_GATE_SKIP=1` turns it off for one command):
 
 ### 1. Git-Predictive Dependency Mapping (`lean-project map predict`)
 * Before prompting the user or splitting a phase into tasks, the engine executes a Git history analysis.
@@ -97,5 +102,4 @@ When the codebase contains indicators of WordPress, WooCommerce, Bricks Builder,
 
 ### 3. Context Waste Hound (`lean-project audit waste`)
 * Scans files for token-wasting code clutter (such as massive boilerplate comments, redundant hook declarations, or dangling `error_log()` entries).
-* Safely evicts this text into `docs/ARCHIVE.md` to lower the baseline token overhead per session message.
-
+* Dry run by default. With `--apply` (git repositories only), comment blocks move verbatim into `docs/ARCHIVE.md` and leave a one-line pointer, which lowers the baseline token overhead per session. Debug logs and repeated hooks are reported, never removed.

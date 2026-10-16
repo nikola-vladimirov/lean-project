@@ -19,12 +19,14 @@ lean-project board T3                   # one card's full history
 lean-project board add T3 <title>       # lead, before delegating
 lean-project board move T3 doing        # todo | doing | blocked | done, optional reason after blocked
 lean-project board note T3 <one line>   # a fact another task needs
+lean-project board files T3 <paths>     # the files the card changes; the gate checks them on done
 ```
 
 Every call is prefixed with `LEAN_BOARD=<absolute path to BOARD.md> LEAN_AS=<agent name>`. The absolute path matters: a worktree has its own copy of the docs folder, and a note written there reaches no one.
 
 - **Agents:** read the board at start; move the card to `doing`; post a note the moment you learn something a sibling task depends on (a contract, a format, a gotcha, a file you had to touch outside your set); `blocked <reason>` and stop when you need another card's output; `done` before replying. Read another card (`board <id>`) when your task depends on it.
 - **Lead:** check `lean-project board` instead of waiting on replies; unblock blocked cards (answer with a note, or rerun the task once its dependency is done). Notes are leads, not proof: verify before relying on them.
+- **The gate runs on `done`.** Record a card's files with `board files`. Moving the card to `done` runs `lean-project check gate <ID>`: `php -l` on its PHP files, and `phpcs` with the WordPress standard when installed (or the project's own `phpcs.xml`). A failure moves the card back to `todo` with the tool output on the card; the agent fixes the code and moves it again. A missing tool is reported in the gate line, not treated as a failure. `LEAN_GATE_SKIP=1` skips the gate for one command.
 - **Notes are facts, not progress.** One line each. "Started", "looking at X", "almost done" cost every reader and say nothing the column does not.
 - **Separate sessions** (`start_session`) use the same file and the same absolute path.
 

@@ -10,6 +10,8 @@ Every decision branches into the decisions that hang off it. The **frontier** is
 
 ## Rounds
 
+With a plan in the docs folder, `lean-project frontier docs/PLAN.md` prints the round's questions (open decisions whose prerequisites are settled) and what waits on them. Write `needs D<n>` into a decision's text when it cannot be asked until another decision is settled, so the frontier tracks it.
+
 1. Ask the whole frontier in one message, numbered, each with your recommended answer. Word each question so "yes" accepts the recommendation.
 2. Wait for the answers. They settle decisions and push the frontier outward; recompute it and ask the next round.
 3. A question that depends on another question still open in this round belongs to a later round.

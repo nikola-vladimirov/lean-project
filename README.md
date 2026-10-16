@@ -60,7 +60,7 @@ The `lean-project` command is on Claude's PATH while the plugin is enabled (you 
 | `lean-project map <file>` | Outline with line ranges: markdown headings, or classes and functions in code |
 | `lean-project map <dir> [min]` | Files of `min`+ lines (default 300), largest first: map those before reading them |
 | `lean-project toc <file>... [--force]` | Build or refresh a contents table between `<!-- toc -->` markers. Files under 80 lines are skipped unless `--force` |
-| `lean-project cost [dir]` | Tokens auto-loaded every session, every doc with flags (`NEEDS TOC`, `STALE TOC`, `STATE FILE OVER 60 LINES`), and lines duplicated across files |
+| `lean-project cost [dir]` | Tokens auto-loaded every session, the startup baseline (first-reply size from recent sessions, skill listing by group), every doc with flags (`NEEDS TOC`, `STALE TOC`, `STATE FILE OVER 60 LINES`), and lines duplicated across files |
 | `lean-project board` | The shared board: cards by column (doing, blocked, todo, done) and the latest 10 notes |
 | `lean-project board <id>` | One card's full history |
 | `lean-project board add <id> <title>` | Add a card (id: letters, digits, `.`, `_`, `-`, like `T3`) |

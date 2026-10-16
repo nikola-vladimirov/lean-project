@@ -36,6 +36,7 @@ Read the lessons file if it exists. Its "Local rules" section outranks the defau
 ## Cost model
 
 - **Auto-loaded** on every turn of every session: the CLAUDE.md chain (the working folder and every parent, plus `~/.claude/CLAUDE.md`), the project's MEMORY.md, every installed skill's description. The most expensive bytes there are.
+- **Startup baseline:** the first reply already carries the system prompt, tool schemas, the skill listing, MCP tool names and hook output, often 50k+ before any file is read. `lean-project cost` measures it. User-scope skills and MCP servers that only one project needs are the cut that pays most.
 - **Read files** are paid once and then carried for every later turn. A 5k-token file read at turn 3 of a 40-turn session is processed about 37 times. Read ranges, not files.
 - **Subagent reads** vanish when the subagent ends. Bulk reading belongs there, on a cheap model, returning only the answer.
 - **Session length** dominates everything else. Every turn re-sends the whole conversation, so a fresh session that starts from a 30-line state file beats a long one.

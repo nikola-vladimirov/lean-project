@@ -1,0 +1,196 @@
+---
+name: bricks-query-loops
+description: "Build or debug Bricks post, term, user, API, Array or provider-backed query loops, including nesting, context and pagination."
+---
+
+# Bricks: query loops
+
+A query loop makes one element render N times: once per post, term, user, API item, array entry, provider-backed field row or relation, WooCommerce cart item, or custom source.
+
+## Where loops can live
+
+The layout elements Container, Section, Block, and Div expose `hasLoop` and
+`query`. The classic Accordion and Slider have their own query controls. For
+nestable sliders, accordions, and tabs, repeat the appropriate child layout element;
+do not assume the parent widget exposes `hasLoop`. Check its runtime schema before
+writing (`includes/elements/container.php`, `accordion.php`, `slider.php`, and
+`includes/abilities/element-settings-schema.php`).
+
+## Discover the live query types first
+
+Do not hard-code the query type list. Bricks seeds `queryTypes` with five built-ins, then runs the `bricks/setup/control_options` filter. Dynamic-data providers and plugins can register more `objectType` values at runtime.
+
+When MCP abilities are available, call `bricks/list-query-loop-types` before choosing a non-core loop type. If it is not exposed as a direct tool, call it through `mcp_adapter_execute_ability`:
+
+```json
+{
+  "ability_name": "bricks/list-query-loop-types",
+  "parameters": {}
+}
+```
+
+Use the returned `items[].objectType` values as the source of truth. If the ability is unavailable on an older branch, use `bricks/list-cms-sources`, `bricks/list-dynamic-data-tags`, and the provider docs as supporting context, but do not invent exact provider object keys.
+
+## Grid and flex layouts with query loops
+
+The element with `hasLoop: true` **is the repeating item**. It renders once per loop item. To lay repeated cards out together, their shared grid/flex container belongs on a non-looping parent. A repeated card can also use grid/flex internally to arrange its own children.
+
+**Correct: grid container is the PARENT of the loop element:**
+
+```
+div  (grid container: display grid, repeat(3,1fr), no loop)
+  `-- div  (hasLoop: true, query)   <- repeats once per post as a grid cell
+        `-- card content
+```
+
+**Wrong: grid CSS on the loop element itself:**
+
+```
+div  (hasLoop: true, query, display grid, repeat(3,1fr))   <- WRONG
+  `-- card content
+```
+
+Result of the wrong pattern: N separate 3-column grids each containing 1 card, all stacking vertically: a single tall column instead of a grid.
+
+For an intended multi-card grid, insert a non-looping parent element, move the grid/flex CSS to that parent, and keep the loop element as the cell template inside it. In the builder this means wrapping the loop element in a Div or Block before enabling "Use Query Loop." Via MCP it means the `set-page-elements` tree has a plain container parent before the element that carries `hasLoop: true`.
+
+## Query types
+
+Built-in seed types:
+
+| `objectType` | Engine | When to use |
+|--------------|--------|-------------|
+| `post` | `WP_Query` | Posts, pages, CPTs, products, media attachments. Default. |
+| `term` | `WP_Term_Query` | Taxonomy archives, category grids. |
+| `user` | `WP_User_Query` | Team pages, author directories. |
+| `api` | Bricks Query API | Remote JSON/data sources configured in the Query API controls. |
+| `array` | Bricks array parser | A JSON/bracket array string from controls or dynamic data. |
+
+Provider and filter-added types can also appear:
+
+| Pattern | Source | Notes |
+|---------|--------|-------|
+| `acf_*` | ACF provider | Relationship, Post Object, Repeater, and Flexible Content fields. Exact keys come from the field name/path. |
+| `mb_*` | Meta Box provider | Post fields, group fields, and relationships. |
+| `je_*`, `je_relation_*` | JetEngine provider | Repeater/posts fields and relations. |
+| `wooCart` | WooCommerce | Current cart contents. |
+| any custom key | `bricks/setup/control_options` plus `bricks/query/run` | Plugins can register their own loop types. |
+
+`includes/setup.php:1120-1126` is only the seed list. The final list is produced after `bricks/setup/control_options` runs. Media is not a separate `objectType`: it is a Posts loop where `post_type` is `attachment`. Custom Query is also not an `objectType`; it is the PHP editor mode available for `post`, `term`, and `user` queries.
+
+### Posts: the common gotchas
+
+- **Always add `ID` as the secondary order-by** when using any non-ID primary (date, title, random). Without it, paginated pages can duplicate posts across pages.
+- **"Disable Query Merge"** must be ON for header/footer/sidebar loops. Bricks auto-merges the archive/search query into the "main" loop on those pages: leaving it off turns every loop on the page into the same results.
+- **Only one archive main query per page.** Bricks scans elements in builder order and uses the first loop marked `is_archive_main_query` to prepare the archive main query (`includes/database.php:222-287`). Do not mark a second loop as the archive main query: pagination and Query Filters will target the main query id Bricks selected, not a competing loop.
+- **Random ordering + pagination**: set `Random seed TTL` to a non-zero value. Otherwise the random seed resets between pages and the same post appears on page 1 and page 2. Set to `0` to disable.
+- **Include / Exclude with dynamic data** (v1.12+): the post type on the loop must match the field's referenced post type. Gallery fields -> Media. Relationship fields -> matching CPT. Mismatch returns no results, silently.
+
+### Media attachments: the `{featured_image}` trap
+
+In an attachment loop, use `{post_id}` for the image source and `{post_title}` for alt/title. **`{featured_image}` does not work for attachment items**: attachments don't have featured images of their own. Use a Posts query with `post_type` set to `attachment`.
+
+### Provider-backed field loops
+
+ACF, Meta Box, and JetEngine loop types are not generic labels like "ACF Repeater." They are exact runtime `objectType` keys such as `acf_team_members`, `mb_project_gallery`, or `je_relation_12`.
+
+- ACF registers loop-capable fields: Relationship, Post Object, Repeater, and Flexible Content. Flexible Content loops can expose `acfFlexiblePreviewMode`.
+- Meta Box registers loop-capable Post fields, Group fields, and relationships.
+- JetEngine registers loop-capable Repeater/Posts fields and relations.
+- Provider-backed loops use `bricks/query/run` and bind loop context through `bricks/query/loop_object`, `bricks/query/loop_object_id`, and `bricks/query/loop_object_type`.
+
+### Array data
+
+Array loops use `objectType: "array"` plus `arrayEditor` content. Use this for a literal JSON/bracket array string or dynamic data that resolves to array-like data. Provider loops such as ACF repeaters usually have their own `acf_*` object type; only use `array` for them when you intentionally feed their data into the array parser.
+
+```
+{query_array}                     -> current array entry (root)
+{query_array @key:'cars'}         -> specific key's value
+```
+
+To loop through a nested array inside the parent loop: nest another Array Loop element, set `arrayEditor` to `{query_array @key:'cars'}`. Array-result filters (`array_conditions`) apply to `array` and to provider object types reported by Bricks as array-condition capable.
+
+### Custom Query (PHP)
+
+- Builder authoring requires the Bricks code-execution capability. Creating or changing Query editor PHP through abilities additionally requires the PHP opt-in and Application Password authorization in [bricks-custom-code](../bricks-custom-code/SKILL.md#code-authoring-through-abilities).
+- For post, term, and user object types, the editor expects a PHP array of query args. Non-array output is ignored after validation and Bricks continues with the remaining query vars, which may produce an empty loop depending on context.
+- Don't use this for things the normal Posts loop or query hooks can do. It is harder to audit and debug.
+
+## The loop-marker trap (critical)
+
+Bricks marks query-loop output so frontend AJAX pagination, Load More, Infinite Scroll, and Query Filters can swap the right DOM region.
+
+Current source flow:
+
+- Server render adds a `data-brx-loop-start` marker to the loop wrapper (`includes/query.php`).
+- Frontend JS converts that marker to a comment shaped like `<!--brx-loop-start-{queryId}-->` (`src/assets/js/frontend.js`).
+
+If cached or optimized HTML removes Bricks loop markers, AJAX swaps silently fail. Check both page source for `data-brx-loop-start` and the live DOM for `<!--brx-loop-start-...-->`. Configure optimization plugins to preserve Bricks loop markers.
+
+## Loop-context dynamic tags
+
+Inside a loop, the current post/term/user context rebinds so these tags resolve against the loop iteration, not the outer page:
+
+**Posts loop:** `{post_id}`, `{post_title}`, `{post_excerpt}`, `{post_content}`, `{post_date}`, `{post_modified}`, `{featured_image}`, taxonomy-specific `{post_terms_{taxonomy}}`, and custom fields as `{cf_meta_key}` after lookup.
+
+**Terms loop:** `{term_id}`, `{term_name}`, `{term_url}`, `{term_description}`, `{term_meta:key}`.
+
+**Users loop:** `{wp_user_display_name}`, `{wp_user_email}`, `{wp_user_id}`, `{wp_user_meta:key}`
+
+**API loop (v2.1+):** `{query_api @key:'title|rendered'}` for nested API data.
+
+**Array loop (v2.2+):** `{query_array}`, `{query_array @key:'name'}`
+
+**Provider-backed loops:** use provider dynamic tags for fields, and post tags when the provider maps the loop object to a `WP_Post` (for example ACF Relationship/Post Object or WooCommerce cart products). Preview dynamic tags against a real context before writing them into a reusable template.
+
+Outside a loop these tags fall back to the current main query: which on an archive is the archive query, on a single post is that post, on a homepage is usually nothing. Always verify the context you expect.
+
+**Tip: hide an outer section when a loop has no results.** Add an element condition to the non-looping wrapper using dynamic data `{query_results_count:LOOP_ELEMENT_ID}` with `compare: ">"` and `value: "0"`. `LOOP_ELEMENT_ID` is the raw Bricks id of the target loop element, not `brxe-...` and not a global query id. This controls server-rendered visibility; AJAX query filters do not rerun element conditions client-side.
+
+## Custom queries via PHP hooks
+
+If the UI can't express what you need, hook into the query pipeline. Don't reach for "Custom Query (PHP)" first: hooks are safer and don't require the code-execution capability on the user.
+
+| Hook | Type | What it does |
+|------|------|--------------|
+| `bricks/posts/query_vars` | filter | Mutate `WP_Query` args for any Posts loop |
+| `bricks/terms/query_vars` | filter | Same for `WP_Term_Query` |
+| `bricks/users/query_vars` | filter | Same for `WP_User_Query` |
+| `bricks/query/run` | filter | Short-circuit the query: return a custom array of items |
+| `bricks/query/result` | filter | Mutate the result array post-fetch, pre-render |
+| `bricks/query/result_count` | filter | Override the count (pagination uses this) |
+| `bricks/query/result_max_num_pages` | filter | Override max pages for pagination |
+| `bricks/query/loop_object` | filter | Swap the object the current iteration binds to |
+| `bricks/query/loop_object_id` | filter | Swap just the id |
+| `bricks/query/loop_object_type` | filter | Swap the type (post / term / user) |
+| `bricks/query/no_results_content` | filter | Custom "no results" output |
+| `bricks/query/before_loop` | action | Fires once before the loop renders |
+| `bricks/query/after_loop` | action | Fires once after |
+| `bricks/query/init_loop_index` | filter | Override starting index |
+| `bricks/posts/merge_query` | filter | Control auto-merge behavior for Posts loops |
+
+Most query lifecycle hooks pass the loop's `$query` object. `$query->element_id` scopes those callbacks to one loop. The `posts/terms/users/query_vars` filters pass query vars plus settings, element id, and element name, so check the signature before writing the callback.
+
+## Debugging: "my loop shows nothing"
+
+Check in this order:
+
+1. **Did you click Save on the page?** Loop configs live in the element settings of the page, not in global state.
+2. **Does the query return results outside Bricks?** Run the equivalent `WP_Query` in a plain template or via `wp shell`. If zero, the query is wrong, not Bricks.
+3. **Is "Disable Query Merge" needed?** (Header/footer/sidebar loops almost always.)
+4. **Does the loop element itself have visible content?** A Block with no children, set to "Use Query Loop", renders N invisible blocks.
+5. **Are the loop's inner dynamic tags actually loop-aware?** `{post_title}` inside a Users loop resolves to the outer post, not the current user. You want `{wp_user_display_name}`.
+6. **Is there a performance plugin or cache layer stripping loop markers?** See the loop-marker trap above.
+7. **Is the include/exclude field post-type aligned?** (See Posts gotchas.)
+8. **For provider-backed loops, is the exact `objectType` present in `bricks/list-query-loop-types`?** If not, the provider, field location, or runtime context is missing.
+9. **Is there a `bricks/query/run` filter hooked somewhere returning `null` or `[]`?** Check theme code and any custom plugins.
+
+If every Array loop item displays the same value, verify that the tag matches the loop that owns the value. Use `{query_array}` or `{query_array @key:'name'}` for the current Array loop item; use a parent loop tag such as `{post_title}` only for values owned by the parent.
+
+## Never do
+
+- Put the layout that distributes repeated cards on their non-looping parent. Grid/flex on an individual looping card is valid for its internal layout.
+- **Don't loop a Template element inside another loop**: templates can't inherit loop context without explicit passing. Use a Block wrapping the content instead.
+- **Don't guess provider `objectType` values from field labels.** Read the runtime list and use the exact key.
+- **Prefer a scoped query hook** for reusable PHP query logic.
+- Nested related-post loops can be appropriate, but run an additional query per outer item. Bound result counts, preserve the correct outer/inner context, and measure repeated-query cost before introducing caching or a different query structure.

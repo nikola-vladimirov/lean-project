@@ -1,6 +1,6 @@
 ---
 name: lean-project
-description: Run a project with the fewest tokens per session. Start a new project (plan with phase gates, folders, state file), grill a loose idea or fuzzy change into decisions, adopt a project already under way, audit or trim CLAUDE.md, handoffs and docs, add contents tables, map large files to read only the needed lines, and build from a plan with tasks routed to Haiku, Sonnet or Opus and coordinated on a shared board. Learns from each run.
+description: Run a project with the fewest tokens per session. Start a new project (plan with phase gates, folders, state file), grill a loose idea or fuzzy change into decisions, adopt a project already under way, audit or trim CLAUDE.md, handoffs and docs, add contents tables, map large files to read only the needed lines, and build from a plan with tasks routed to Haiku, Sonnet or Opus and coordinated on a shared board. Also holds, read only when a task needs them, the Bricks and BricksExtras builder skills and the REA reverse-engineering guide. Learns from each run.
 ---
 
 # lean-project
@@ -16,10 +16,18 @@ One goal: the fewest tokens a session spends to get oriented, stay oriented and 
 | Sharpen a fuzzy change, feature or design in an existing project | `GRILL.md` (with docs) |
 | Organize, audit or trim docs, CLAUDE.md, memory or handoffs | `DOCS.md` |
 | Build from the plan (a phase, a feature, a release) | `BUILD.md` |
+| Build or change a Bricks or BricksExtras site, page, template, element, query or condition | `builder/INDEX.md`, then only the one `builder/<skill>/SKILL.md` the task needs |
+| Reverse-engineer a shipped app, package, firmware or browser target | `reverse/SKILL.md`, then only the reference file it names |
+
+The builder and reverse folders are on-demand reference. Their old standalone skills are parked, so nothing else loads them. Read them only for the task at hand: a plan step that names a Bricks element or REA target is the trigger, not a general interest. Plain WordPress plugin work does not need them.
+
+REA needs its MCP server, which is parked for startup cost. If the REA tools are not loaded, tell the user to run `bash ~/.claude/skills-off/parked.sh rea on <folder>` and start a new session. Do not work without it.
 
 ## Paths and settings (the guides refer here)
 
 - Guides and `templates/`: `${CLAUDE_PLUGIN_ROOT}/skills/lean-project/`
+- Builder (Bricks): `${CLAUDE_PLUGIN_ROOT}/skills/lean-project/builder/`. Its generated JSON schema data (about 23 MB) stays at `~/.claude/skills-off/bricks/<skill>/references/`, read by path, never copied into a plugin.
+- Reverse (REA): `${CLAUDE_PLUGIN_ROOT}/skills/lean-project/reverse/`
 - Lessons: `${CLAUDE_PLUGIN_DATA}/LESSONS.md`
 - **Docs folder:** wherever the project's index keeps its docs (`docs/` for projects this skill started). Plan, state file, glossary, board and archive all go there, under the project's own file names when it has them. Never inside a folder that ships (a plugin, package or theme folder that is zipped or published whole): check the index and the build or ignore rules first.
 - Always back up docs before editing: `${user_config.backup_docs}`. Backup folder: `${user_config.backup_dir}`.

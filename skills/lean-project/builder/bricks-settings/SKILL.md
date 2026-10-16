@@ -1,0 +1,117 @@
+---
+name: bricks-settings
+description: "Read or change allow-listed Bricks global settings, preserving unrelated keys and respecting credential/code exclusions."
+---
+
+# Bricks: global settings (via MCP)
+
+Bricks global settings (the `bricks_global_settings` option: hundreds of keys backing the admin Settings pages) are exposed to MCP through an **allow-list registry**. Discover writable keys, read their current values, then send a partial update.
+
+Three tools. Use them in order:
+
+1. **`bricks/list-settings-schema`**: read-only discovery. Returns every key the MCP will accept, with type, category, description, and validation hints. Call this first if you don't already know which key to write.
+2. **`bricks/get-global-settings`**: read current values for keys in the registry. Never returns excluded credential values or code-execution toggles.
+3. **`bricks/set-global-settings`**: partial-merge write. Takes `{ settings: { key: value, ... } }`. Other keys untouched.
+
+## Partial-merge semantics
+
+`set-global-settings` updates the keys you send and leaves everything else alone. Batch requested top-level changes in one call.
+
+```
+bricks/set-global-settings
+  settings:
+    postTypes: ["page","post","product","bricks_template"]
+    cssLoading: "file"
+```
+
+Result: `postTypes` and `cssLoading` updated; every other setting (maintenance mode, disable emojis, etc.) retained exactly as it was.
+
+## What the registry contains
+
+Dozens of keys across categories. Current examples from `includes/abilities/settings.php`:
+
+- **general**: `postTypes`, `wp_to_bricks`, `bricks_to_wp`, `disableClassManager`, `disableVariablesManager`, `disableOpenGraph`, `disableSeo`, `elementAttsAsNeeded`, `customImageSizes`, `disableSkipLinks`, `smoothScroll`, `deleteBricksData`, `searchResultsQueryBricksData`, `themeStylesLoadingMethod`, `duplicateContent`, `enableQueryFilters`
+- **templates/forms**: `publicTemplates`, `myTemplatesAccess`, `myTemplatesWhitelist`, `remoteTemplates`, `saveFormSubmissions`
+- **builder/MCP**: `builderAutosaveInterval`, `builderQueryMaxResults`, `builderLocale`, `abilitiesApi`
+- **performance toggles**: `cssLoading`, `disableBricksCascadeLayer`, `disableEmojis`, `disableJqueryMigrate`
+- **bricks-maintenance**: `maintenanceMode`, `maintenanceTemplate`, `bypassMaintenanceUserRoles`, `maintenanceExcludedPosts`
+- **password protection**: `passwordProtectionEnabled`
+
+Call `list-settings-schema` to see the current full list: it's auto-generated from the registry and stays in sync with Bricks updates.
+
+## Excluded settings
+
+These are blocked at the registry level (see `Settings::EXCLUDED_SETTING_KEYS`). Attempting `set-global-settings` with any of these returns `bricks_setting_excluded`. The literal list:
+
+- `licenseKey`: plus any key starting with `license`, `apiKey`, or `apiSecretKey`
+- `instagramAccessToken`
+- `myTemplatesPassword`
+- `remoteTemplatesPassword`
+- `remoteTemplates[].password`
+- `executeCodeEnabled`: master toggle for the custom-PHP execution path
+- `executeCodeCapabilities`: role matrix controlling who can execute code
+- `codeSignaturesLocked`: prevents tampering with the signature-verification defense
+- `codeExecutionMode`
+- `htmlExecutionMode`
+
+Use an authorized admin/configuration workflow for excluded settings. Signature regeneration also has no MCP ability; see [bricks-maintenance](../bricks-maintenance/SKILL.md).
+
+`remoteTemplates` can manage saved source URLs and optional names only. Passwords are preserved if already configured, but never returned or written. New MCP-written remote template URLs must be public `http`/`https` URLs: private, loopback, link-local, unsafe-port, credentialed, or non-resolving hosts are rejected because those URLs are later used for outbound template-library fetches.
+
+## Credential status
+
+Use `bricks-list-credential-status` when you only need to know whether a credential exists. It returns rows with `configured`, `readable: false`, and `writable: false`; it never returns the stored value or a masked fragment.
+
+Good uses:
+
+- Map work: check `apiKeyGoogleMaps.configured` before building a Google Maps experience.
+- Form spam protection: check the matching site key and secret key before enabling reCAPTCHA, hCaptcha, or Turnstile.
+- Integrations: check Mailchimp, SendGrid, Instagram, and template-library credentials before assuming the integration can run.
+
+Do not ask for the raw value. If a required credential is missing, tell the user which setting to add in the Bricks admin UI.
+
+## Unknown-key handling
+
+`set-global-settings { settings: { fooBarBaz: 1 } }` where `fooBarBaz` isn't in the registry returns `bricks_setting_unknown`.
+
+For these settings, use the dedicated abilities:
+
+- Breakpoints -> `bricks/list-breakpoints`, then `bricks/set-breakpoints` with its
+  `breakpointOwnership`; changing `customEnabled` also requires the returned
+  `globalSettingsOwnership`
+- Style manager -> `bricks/set-style-manager`
+- Pseudo-classes -> `bricks/list-pseudo-classes`, then `bricks/set-pseudo-classes`
+  with its `ownership` as `expectedOwnership`; removals require
+  `allowRemovedPseudoClasses: true` after reviewing usage evidence
+- Element enable/disable -> element-manager abilities
+- Icon libraries -> icons abilities
+- Builder role access -> `bricks/list-builder-permissions`, `bricks/upsert-builder-capability`, `bricks/set-builder-role-access`
+
+The registry is for keys that don't fit into one of those domains.
+
+## Tool availability
+
+> **If a `bricks/*` ability is not available as a direct tool**: first check whether it is outside the fast path and call it through `mcp-adapter-execute-ability` with `ability_name: "bricks/<name>"`. If the dispatcher also rejects it, call `bricks-list-ability-status` to check whether a site admin disabled it under Bricks > AI.
+
+## Typical flow
+
+```
+bricks/list-settings-schema
+  -> scan output for "maintenance" category
+  -> find maintenanceMode, maintenanceTemplate, bypassMaintenanceUserRoles, maintenanceExcludedPosts
+
+bricks/get-global-settings (optional: check current values)
+
+bricks/set-global-settings
+  settings:
+    maintenanceMode: "maintenance"
+    maintenanceTemplate: 123
+    bypassMaintenanceUserRoles: "custom"
+    maintenanceExcludedPosts: ["45","88"]
+```
+
+## Don't
+
+- Don't write settings by calling `bricks/get-global-settings` -> mutating -> `bricks/set-global-settings` with the whole blob. It works, but it defeats partial-merge and races with admin UI saves.
+- Don't retry on `bricks_setting_excluded`: the exclusion is permanent and deliberate.
+- Don't treat `list-settings-schema` output as cacheable across Bricks versions: new keys show up with updates.

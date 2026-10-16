@@ -38,6 +38,9 @@ Every call is prefixed with `LEAN_BOARD=<absolute path to BOARD.md> LEAN_AS=<age
 | Well-specified unit from the plan (one class or function with its contract) plus its tests | sonnet | medium | Agent (general-purpose), one writer per file set |
 | Admin screens, settings, i18n strings, readme and changelog drafts | sonnet | low | Agent |
 | Lint and static-analysis fixes | sonnet | low | Agent, loop until clean |
+| Bricks or BricksExtras element, template, query, condition or form, one well-specified change | sonnet | medium | Agent; the brief names its one `builder/<skill>/SKILL.md` (from `builder/INDEX.md`) under "Read only" |
+| Bricks site architecture, global styles, or a broad site audit | lead | the session's own | here, with `builder/INDEX.md` routing to the one skill needed |
+| REA reverse-engineering analysis (evidence, decompile, version diff) | lead | the session's own | here, after `reverse/SKILL.md` and the one reference it names; REA MCP must be on |
 | Architecture, data model, migrations, sync and idempotency, money or data-loss paths | lead | the session's own | here, not delegated |
 | Security review, phase code review, acceptance check | opus | high | Agent with fresh context (not the author's); the lead itself when the lead is Opus and has not written the code |
 | A failure the first route could not fix twice | see "After each task" | | |

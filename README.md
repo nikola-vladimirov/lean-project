@@ -22,6 +22,8 @@ A Claude Code plugin that makes every session cheaper. Claude re-sends the whole
 - **Build mode** works through the plan phase by phase and routes tasks by model and effort: Haiku for bulk reading and fixtures, Sonnet for well-specified code, tests and lint fixes, Opus for review and acceptance, the main session for design. Each task gets a short self-contained brief, the main session verifies every result, and a failing task climbs effort before it climbs models.
 - **A shared board** lets parallel subagents and sessions talk while they work: cards move through todo, doing, blocked and done, and agents post one-line facts their siblings need (a contract, a format, a gotcha). It is one append-only file, so parallel writers never overwrite each other, and the lead reads a compact view instead of waiting on replies. At each phase gate, lasting notes move into the plan and the board is archived.
 - **Phase gates**: acceptance checks ticked by a fresh reviewer, plus security review, code review and tests before a build is final.
+- **Builder skills on demand.** The 108 Bricks and BricksExtras skills live inside this one skill, in `builder/`. `builder/INDEX.md` routes a task to the one skill it needs, so nothing loads unless a plan step names a Bricks element, template or query. Their generated JSON schema data stays out of the plugin.
+- **Reverse engineering on demand.** The REA guide lives in `reverse/` and loads only for reverse-engineering tasks. REA's MCP server stays off by default (startup cost) and is switched on per folder.
 
 **Session hygiene**
 

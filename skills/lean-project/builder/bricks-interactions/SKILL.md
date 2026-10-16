@@ -1,0 +1,188 @@
+---
+name: bricks-interactions
+description: "Create or debug Bricks element interactions, including inherited class actions, targets, callbacks and frontend behavior."
+---
+
+# Bricks: interactions
+
+Interactions are the no-code behavior system: `{ trigger, action }` pairs that wire clicks, hovers, scrolls, and form events to DOM mutations, popup opens, offcanvas toggles, and JS callbacks. Element-level interactions are stored on `element.settings._interactions` as an array. Global classes can also store `_interactions`, and every element using that class inherits those rows at render time.
+
+## The schema
+
+Storage key: **`_interactions`** on `element.settings` or on a global class setting object. Array of objects. Each object has fields from `includes/interactions.php:94-491`: 30+ possible keys, most conditional on the trigger/action combination.
+
+The `update-element-interactions` ability writes only element-level rows. It generates missing row IDs and validates trigger, action, target, JavaScript callback references, and action/trigger-specific required fields before saving.
+
+Minimum shape:
+
+```json
+{
+  "id": "abc123",
+  "trigger": "click",
+  "action": "show",
+  "target": "custom",
+  "targetSelector": "#my-modal"
+}
+```
+
+## Element triggers
+
+Authoritative list at `includes/abilities/interactions.php` (`Interactions::TRIGGERS`), sourced from `includes/interactions.php` controls. Popup template interactions add two template-only triggers, `showPopup` and `hidePopup`, under `template_interactions`.
+
+| Trigger | Fires when |
+|---|---|
+| `click` | Element clicked |
+| `mouseover` | Pointer over |
+| `mouseenter` | Pointer enters bounding box |
+| `mouseleave` | Pointer leaves bounding box |
+| `focus` | Element focused (keyboard/tab) |
+| `blur` | Focus lost |
+| `scroll` | Page scrolled (configurable %/px) |
+| `contentLoaded` | DOM ready |
+| `mouseleaveWindow` | Exit-intent: pointer exits top of window |
+| `enterView` | Element enters viewport |
+| `leaveView` | Element leaves viewport |
+| `animationEnd` | CSS animation completes |
+| `formSubmit` | Form submitted (any form) |
+| `formSuccess` | Form submitted + server returned success |
+| `formError` | Form returned error |
+| `ajaxStart` | Query AJAX loader started |
+| `ajaxEnd` | Query AJAX loader completed |
+| `filterSubmitStart` | Query filter submit started |
+| `filterSubmitEnd` | Query filter submit completed |
+
+Feature-scoped triggers (same const, also accepted by MCP):
+- Query filters: `filterSubmitStart`, `filterSubmitEnd`, `filterOptionEmpty`, `filterOptionNotEmpty`
+- WooCommerce: `wooAddedToCart`, `wooAddingToCart`, `wooRemovedFromCart`, `wooUpdateCart`, `wooCartContentsChanged`, `wooCouponApplied`, `wooCouponRemoved`
+
+`wooCartContentsChanged` listens for `bricks/woocommerce/cart-contents-changed`,
+so use it for behavior that must respond to Bricks cart-content updates. The frontend
+also handles `wooDynamicFragmentsRefreshed` and `wooCheckoutStepChanged`, but the
+2.4 interaction ability's allow-list does not admit those two values. Do not infer
+ability support merely from frontend JavaScript; check the target site's schema.
+
+## Actions
+
+Authoritative list at `includes/abilities/interactions.php:68-87` (`Interactions::ACTIONS`).
+
+| Action | What it does | Extra keys |
+|---|---|---|
+| `show` | Unhide target, or open a popup when `target: "popup"` | None, or `templateId` when `target: "popup"` |
+| `hide` | Hide target, or close a popup when `target: "popup"` | None, or `templateId` when `target: "popup"` |
+| `click` | Programmatic click on target | None |
+| `startAnimation` | Trigger a CSS animation | `animationType`, `animationDuration`, `animationDelay` |
+| `scrollTo` | Scroll to target | `scrollToOffset`, `scrollToDelay` |
+| `setAttribute` | Add/set attribute on target | `actionAttributeKey`, `actionAttributeValue` |
+| `removeAttribute` | Remove attribute | `actionAttributeKey` |
+| `toggleAttribute` | Toggle attribute presence or value | `actionAttributeKey`, `actionAttributeValue` |
+| `toggleOffCanvas` | Open/close an offcanvas element | `offCanvasSelector` |
+| `loadMore` | Load next page on a query loop | `loadMoreQuery` |
+| `loadMoreGallery` | Same, for image galleries | `loadMoreTargetSelector` |
+| `openAddress` | Open a map info box | `infoBoxId` plus map element context |
+| `closeAddress` | Close a map info box | `infoBoxId` plus map element context |
+| `clearForm` | Reset form fields | `targetFormSelector` unless the trigger is a form event |
+| `storageAdd` | Write to browser storage | `storageType`, `actionAttributeKey`, `actionAttributeValue` |
+| `storageRemove` | Remove from browser storage | `storageType`, `actionAttributeKey` |
+| `storageCount` | Increment a counter in browser storage | `storageType`, `actionAttributeKey` |
+| `javascript` | Call a named JavaScript function on `window` | `jsFunction`, optional `jsFunctionArgs` |
+
+There is no `openPopup`, `customJs`, or inline `javascript` source field. The `javascript` action calls an existing frontend function by name through `jsFunction` (for example `MyApp.trackCardClick`) and optional `jsFunctionArgs`; it does not evaluate arbitrary JavaScript text. To open a popup with native interaction data, use `action: "show"`, `target: "popup"`, and `templateId`. JavaScript can still call `bricksOpenPopup(id)`, but use the native shape when authoring Bricks data.
+
+For `jsFunctionArgs`, each argument row needs `jsFunctionArg` and an `id`. The MCP writer generates missing IDs. Without IDs, the frontend skips the argument row.
+
+## Targets: three modes
+
+Defined at `includes/abilities/interactions.php` (`Interactions::TARGETS`). MCP accepts exactly these three explicit values: `self`, `custom`, `popup`. If `target` is omitted, Bricks treats the interaction as `self` at runtime. Offcanvas open/close is saved as `action: "toggleOffCanvas"`; during render Bricks rewrites it internally to an offcanvas target for frontend handling.
+
+| Mode | Setting | Resolves to |
+|---|---|---|
+| `self` | `target: "self"` | The element that owns the interaction |
+| `custom` | `target: "custom"`, `targetSelector: "#foo"` or `.bar` | CSS selector (querySelector semantics) |
+| `popup` | `target: "popup"`, `templateId: 123` | A popup template id |
+
+Use CSS selectors for custom targets. To target a specific Bricks element by id, use `#brxe-{element_id}` only when the target element has no custom CSS ID. If the target has `_cssId`, Bricks renders that custom ID on the frontend instead, so target the custom selector (for example `#hero-panel`). If you rely on the auto id, the selector also breaks if the element is duplicated (new id).
+
+Safer: add a CSS class to the target via the Element ID/Class panel (e.g. `.js-main-nav`), then target `.js-main-nav` from the interaction. Survives element duplication.
+
+## Global-class inheritance: interactions on classes
+
+Interactions can live on a global class (same place as the class's other settings). Every element using that class inherits the interactions (`interactions.php:531-539`).
+
+Merge rule: interactions on an element **stack with** (do not override) interactions on the element's applied classes. So if a button has `click -> show #foo` and the button also has a class with `click -> scrollTo #top`, both fire on click.
+
+Edit the global class to change inherited interactions.
+
+MCP readback exposes this explicitly:
+
+- `interactions`: element-level rows only.
+- `inheritedInteractions`: grouped global-class rows.
+- `effectiveInteractions`: flattened frontend order, with `source`, `sourceId`, and `sourceName` on each row.
+
+## Infinite-loop traps
+
+1. **`enterView -> startAnimation` on a scroll-repeating element.** If the animation moves the element out of then back into view, it re-fires. Add `Run once` on the interaction.
+
+2. **`click -> click` on another element that clicks back.** Infinite click loop. Happens often with "link both of these" logic. Add a guard or use a different mechanism.
+
+## Run-once / frequency
+
+Every interaction has a **Run once** boolean (`runOnce`) and optional **interaction conditions** (`interactionConditions`, defined in `includes/interactions.php`) based on browser storage:
+
+- `windowStorage`: page-load counter
+- `sessionStorage`: tab-lifetime counter
+- `localStorage`: cross-session counter
+
+With compare operators: `exists`, `notExists`, `==`, `!=`, `>=`, `<=`, `>`, `<`.
+
+Example: "fire at most 3 times across sessions": add a condition against a local-storage key, then pair it with `storageCount` using `storageType: "localStorage"` and the same key in `actionAttributeKey`.
+
+## Performance cost
+
+Every interaction adds:
+- Event listener(s) at DOM-ready.
+- JSON payload in `data-interactions` attribute (shipped inline per element).
+- Per-fire work: target lookup, condition check, action execution.
+
+Profile pages with repeated interactive elements before changing their behavior.
+
+- Use CSS pseudo-classes for simple hover and focus styling.
+- Use global-class interactions for shared authoring. Each element still inherits the rendered interaction rows and listeners.
+- Use an enqueued JavaScript handler when delegated event handling would reduce measured overhead.
+- Store JavaScript callbacks in an enqueued file and reference them through `jsFunction`.
+
+## Hooks
+
+Few dedicated interaction hooks exist. For render-attribute level tweaks, use the element-render hooks (`bricks/element/render_attributes`). For popup-related interaction behavior, use `bricks/popup/attributes`.
+
+Interactions are largely frontend-only. WPML-aware behavior for popup interactions is handled at `interactions.php:585-600, 688-705` (popup template id translation).
+
+## Silent-failure debug order
+
+1. **Interaction doesn't fire?**
+   a. DevTools Elements -> find the element -> check `data-interactions` attribute. Is your interaction in the JSON? No -> saved state doesn't match builder. Resave.
+   b. Check browser console for errors. For JavaScript actions, verify that the named function exists on `window` and inspect callback errors.
+   c. Trigger mismatch: `click` on a disabled button, `scroll` on a non-scrolling container.
+
+2. **Interaction fires but target isn't affected?**
+   a. Target selector is wrong. Test `document.querySelectorAll("your-selector")` in the console.
+   b. Target doesn't exist yet at trigger time (e.g., targeting an element inside a popup before the popup renders).
+
+3. **Fires too many times?**
+   a. Class-level interaction duplicating element-level. Check the applied classes.
+   b. Missing `runOnce`. Enable it.
+   c. One of the infinite-loop traps above.
+
+4. **Fires on wrong elements?**
+   a. Selector too broad. `.btn` matches every button on the page.
+   b. Global class interaction applies to more elements than you expected.
+
+5. **Works in builder, fails on frontend (or vice versa)?**
+   a. Interaction references a popup template id that doesn't render in the builder context.
+   b. Trigger is a frontend-only event (`formSubmit`): builder doesn't submit real forms.
+
+## MCP abilities for interactions
+
+- `get-element-interactions`: read element-level rows, inherited global-class rows, and flattened effective rows.
+- `update-element-interactions`: replace element-level rows on an element. It validates element-level triggers only, generates missing row IDs, and never mutates inherited global-class rows. Popup template-level `showPopup` and `hidePopup` live in popup template settings as `template_interactions`.
+
+Use `formSuccess` for actions that require a successful submission. Enable `runOnce` when the action should stop after its first matching event.

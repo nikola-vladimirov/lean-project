@@ -1,6 +1,6 @@
 # Stage contract: <stage name>
 
-Use one per stage of a multi-stage workflow. Keep it to these three sections.
+Use one per stage of a multi-stage workflow. The first three sections are required. Checkpoints and Audit are for creative or build stages; delete them for linear stages (extract, convert, render).
 
 ## Inputs
 
@@ -14,6 +14,22 @@ Load only these rows. Anything else is out of scope for this stage.
 
 1. <step>
 2. <step>
+
+## Checkpoints
+
+Pause here for the user to steer before the next unit of work.
+
+| After step | Agent presents | User decides |
+|---|---|---|
+| <step number> | <options or draft> | <direction to choose> |
+
+## Audit
+
+Run these before writing to output/. If a check fails, revise first.
+
+| Check | Pass condition |
+|---|---|
+| <check name> | <what passing looks like> |
 
 ## Outputs
 

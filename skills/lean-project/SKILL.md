@@ -81,7 +81,7 @@ Read the lessons file if it exists. Its "Local rules" section outranks the defau
 
 ## Session hygiene
 
-- A hook nudges once the conversation passes the context limit (default 300k tokens, then every 50k; the user can change both in `/config`). When it fires: finish the current step, update the state file, and tell the user to start a new session from it. Do not start large work.
+- A hook nudges once the conversation passes the context limit (default 300k tokens, then every 50k; the user can change both in `/config`). When it fires: finish the current step, update the state file, then open the new-session dialog: `mcp__ccd_session__start_session` with `initiation` `own_initiative`, `context` `fresh`, and a brief of at most 120 words that names only the index, the state file and the next step. The fresh session reads those two files first and nothing else until they point to it, so it never rereads the whole project. Do not start large work.
 - End a session at every phase or milestone boundary anyway, after updating the state file.
 
 ## After any mode: improve

@@ -26,4 +26,8 @@ last=$(cat "$state_dir/nudge-$session" 2>/dev/null || echo -1)
 echo "$bucket" > "$state_dir/nudge-$session"
 
 k=$(( ctx / 1000 ))
-printf '{"systemMessage":"lean-project: this conversation is about %sk tokens, and every turn re-sends all of it. Finish the current step, update the state file, then start a new session from it.","hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"lean-project: context is about %sk tokens (limit %s). Finish the step in hand, update the project state file (Now, In progress, Next) so a fresh session can continue, and tell the user it is a good point to start a new session. Do not begin a new large task in this session."}}\n' "$k" "$k" "$limit"
+cwd=$(field cwd | sed 's/\\\\/\//g')
+project=$(basename "$cwd")
+# Claude opens the dialog with start_session (offer card): the user picks "New session" or "Do it here".
+# The brief stays short so the fresh session reads only the index and state file, not the whole project again.
+printf '{"systemMessage":"lean-project: this conversation is about %sk tokens, and every turn re-sends all of it. Finish the current step, update the state file, then offer a new session.","hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"lean-project: context is about %sk tokens (limit %s). Finish the step in hand and update the project state file (Now, In progress, Next) so a fresh session can resume from it alone. Then call mcp__ccd_session__start_session with initiation own_initiative, context fresh, title Resume %s, and a brief of at most 120 words that names only: the project index file, the state file, the next step from the state file, and the rule that the new session reads those two files first, uses lean-project map for any code and does not reread files they do not name. Do not begin a new large task in this session."}}\n' "$k" "$k" "$limit" "$project"

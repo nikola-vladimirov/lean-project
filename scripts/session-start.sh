@@ -12,5 +12,12 @@ grep -qs 'Theme Name:' style.css && wp=1
 grep -qs 'wordpress\|woocommerce' composer.json && wp=1
 if [ -n "$wp" ]; then
   echo "WordPress project detected. Before changing code, read ${CLAUDE_PLUGIN_ROOT:-.}/skills/lean-project/WORDPRESS.md: how to read the docs, check changelogs, best practices, and the security checklist and fixes."
+  echo "For WordPress.org submission, read ${CLAUDE_PLUGIN_ROOT:-.}/skills/lean-project/reference/wordpress-agent-skills/wp-plugin-directory-guidelines.md. For static analysis, read reference/wordpress-agent-skills/wp-phpstan.md. Read only the one the task needs."
+fi
+woo=""
+grep -qs 'WooCommerce' ./*.php && woo=1
+grep -qs 'woocommerce' composer.json && woo=1
+if [ -n "$woo" ]; then
+  echo "WooCommerce code detected. For order, product, checkout or payment code, read ${CLAUDE_PLUGIN_ROOT:-.}/skills/lean-project/reference/guard-skills/woo-guard.md first."
 fi
 exit 0

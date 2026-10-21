@@ -21,6 +21,7 @@ One goal: the fewest tokens a session spends to get oriented, stay oriented and 
 | Build or review WordPress, WooCommerce, Bricks or block-editor code (plugin, theme, companion script) | `WORDPRESS.md`: how to read the docs, check changelogs, best practices, the security checklist and fixes. Read it before changing that code, every time. |
 | Build or change a Bricks or BricksExtras site, page, template, element, query or condition | `builder/INDEX.md`, then only the one `builder/<skill>/SKILL.md` the task needs |
 | Reverse-engineer a shipped app, package, firmware or browser target | `reverse/SKILL.md`, then only the reference file it names |
+| Check a WordPress plugin for WordPress.org submission, set up PHPStan, review WooCommerce code, check docs against code, or review tests | `reference/README.md`, then only the one file it points to |
 
 The builder and reverse folders are on-demand reference. Their old standalone skills are parked, so nothing else loads them. Read them only for the task at hand: a plan step that names a Bricks element or REA target is the trigger, not a general interest. Plain WordPress plugin work does not need them.
 

@@ -12,16 +12,22 @@ Every decision branches into the decisions that hang off it. The **frontier** is
 
 With a plan in the docs folder, `lean-project frontier docs/PLAN.md` prints the round's questions (open decisions whose prerequisites are settled) and what waits on them. Write `needs D<n>` into a decision's text when it cannot be asked until another decision is settled, so the frontier tracks it.
 
-1. Ask the whole frontier in one message, numbered, each with your recommended answer. Word each question so "yes" accepts the recommendation.
-2. Wait for the answers. They settle decisions and push the frontier outward; recompute it and ask the next round.
-3. A question that depends on another question still open in this round belongs to a later round.
+1. Ask the whole frontier with `AskUserQuestion`: one card per question, up to 4 cards per call (send several calls if the frontier is bigger). The user never has to type a long answer.
+2. Each card gets 2 to 4 proposed answers. The first one is your recommendation, labelled "(Recommended)". The card's built-in "Other" field is the custom answer. Word each option so picking it settles the decision.
+3. Keep the question itself short, and put the context in the option descriptions. Use a 12-character `header` tag per question.
+4. Wait for the answers. They settle decisions and push the frontier outward; recompute it and ask the next round.
+5. A question that depends on another question still open in this round belongs to a later round.
 
 ```
-**Q1. <title>**: <question, with the options when there are some>
-Recommended: <answer>
-
-**Q2. <title>**: ...
+AskUserQuestion:
+  question: "Who signs in to the admin?"
+  header: "Admin login"
+  options:
+    - label: "WP users (Recommended)"   description: "Reuses WordPress accounts and roles; no new login."
+    - label: "Separate login"           description: "Own table and password; more code to maintain."
 ```
+
+If `AskUserQuestion` is not available (no interactive session), fall back to the numbered text list with a recommended answer for each question.
 
 ## Facts are yours, decisions are theirs
 

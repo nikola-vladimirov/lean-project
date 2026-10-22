@@ -32,9 +32,14 @@ A Claude Code plugin that makes every session cheaper. Claude re-sends the whole
 - **Builder skills on demand.** The 108 Bricks and BricksExtras skills live inside this one skill, in `builder/`. `builder/INDEX.md` routes a task to the one skill it needs, so nothing loads unless a plan step names a Bricks element, template or query. Their generated JSON schema data stays out of the plugin.
 - **Reverse engineering on demand.** The REA guide lives in `reverse/` and loads only for reverse-engineering tasks. REA's MCP server stays off by default (startup cost) and is switched on per folder.
 
+**Delegation**
+
+- **Send bulk work elsewhere.** Each project chooses where delegated work goes: `none` (everything stays with Claude), `llama` (a local llama.cpp server) or `opencode` (free OpenCode models only). Bulk reading, code sweeps, fixtures and lint loops go there. Security, architecture and review stay with Claude.
+- **Asked once per project.** The first session in a project, new-project setup and adoption each ask the choice, and it is saved in `.lean-project` at the project root.
+
 **Session hygiene**
 
-- **A fresh-session reminder** (a hook) speaks up once the conversation passes a context limit: update the state file, then start over from it.
+- **A fresh-session reminder** (a hook) speaks up once the conversation passes a context limit: update the state file, then Claude offers a new session in a dialog. The brief names only the index, the state file and the next step, so the fresh session does not reread the project.
 - **It learns.** Each run records a lesson in your own data folder, including which model passed which kind of task; a lesson seen twice becomes a local rule that outranks the defaults.
 
 ## Install
@@ -46,7 +51,35 @@ In Claude Code:
 /plugin install lean-project@lean-project
 ```
 
-Requires bash: built in on macOS and Linux, and Git Bash on Windows (which Claude Code uses there). No other dependencies.
+Requires bash: built in on macOS and Linux, and Git Bash on Windows (which Claude Code uses there). Everything except delegation needs no other dependencies. Delegation needs `curl` and `node` (both in Git Bash on Windows), plus a running llama.cpp server or the OpenCode desktop app.
+
+## Delegating work
+
+1. **Start a local model server (optional).** With llama.cpp, start `llama-server` with the model you want on a port you choose (the author's setup uses 9931 with the Gemma 12B coder GGUF, `yuxinlu1/gemma-4-12B-coder-fable5-composer2.5-v1-GGUF:Q4_K_M`). Check the server's own help for its flags.
+
+2. **Pick the runner for a project.** Answer the question Claude asks at the start of a session, or run it yourself in the project folder:
+
+   ```bash
+   lean-project delegate set runner llama
+   ```
+
+   For OpenCode instead, use `lean-project delegate set runner opencode`. Only free models (`opencode/*-free`) are accepted. The default is `opencode/deepseek-v4.1-flash-free`, and you can change it with `lean-project delegate set opencode_model <model>`.
+
+3. **Check the runner:**
+
+   ```bash
+   lean-project delegate check
+   ```
+
+4. **Run a brief.** Write the task and the material it needs into a file, then send it:
+
+   ```bash
+   lean-project delegate run brief.md answer.md
+   ```
+
+   The answer is written to `answer.md`. Read it and verify it before using it. A brief with no context gets a generic answer, so include the excerpt or file the model should work on.
+
+The llama default URL is `http://127.0.0.1:9931`. Change it with `lean-project delegate set llama_url <url>` if your server runs elsewhere. The model name for llama is set with `llama_model`.
 
 ## Use
 
@@ -59,6 +92,7 @@ Ask in plain words, or run the skill directly (`/lean-project:lean-project`):
 | "Take over this project" / "Give this project a plan" | A plan reconstructed from code, git and docs; questions only about the gaps |
 | "Audit the docs in this project for token use" | Measures, trims and reports before and after |
 | "Build phase 2 from the plan" | Splits the phase into tasks, routes them across models, coordinates them on the board, checks the gate |
+| "Delegate this to the local model" | Writes a brief and runs it through `lean-project delegate run` on the project's runner |
 
 ## Commands
 
@@ -84,6 +118,10 @@ The `lean-project` command is on Claude's PATH while the plugin is enabled (you 
 | `lean-project lessons` | Show the local rules and where the lessons file is |
 | `lean-project audit security [dir]` | Read-only scan of PHP and JS for WordPress anti-patterns (unescaped output, unprepared SQL, missing nonce or capability checks, dangerous functions) |
 | `lean-project handoff [docs/PLAN.md]` | Draft of the state file: branch, next tasks, cards in flight (prints only) |
+| `lean-project delegate config` | Show the project's delegation choice, or that none is set yet |
+| `lean-project delegate set <key> <value>` | Save a key in `.lean-project`: `runner` (`none`, `llama`, `opencode`), `llama_url`, `llama_model`, `opencode_cli`, `opencode_model` |
+| `lean-project delegate check` | Check the chosen runner answers (llama server up, OpenCode model listed) |
+| `lean-project delegate run <brief> <output>` | Send a brief to the runner and write the answer to a file |
 | `lean-project selftest` | Check the tool on this machine |
 
 Board environment variables: `LEAN_BOARD` is the board file (default `docs/BOARD.md`; agents always pass an absolute path, since a worktree has its own copy of the docs folder) and `LEAN_AS` is the writer's name (default `lead`).
@@ -110,6 +148,7 @@ Board environment variables: `LEAN_BOARD` is the board file (default `docs/BOARD
 │   ├── GLOSSARY.md    the project's own terms (once grilling settles one)
 │   ├── BOARD.md       shared board (during a build phase)
 │   └── ARCHIVE.md     replaced text, verbatim (once something is replaced)
+├── .lean-project      delegation choice: runner, llama_url, llama_model, opencode_model
 └── <code>/
 ```
 
@@ -117,7 +156,7 @@ Projects already under way keep their own names and doc folder. Docs never go in
 
 ## Where your data lives
 
-Lessons go to the plugin's data folder (`~/.claude/plugins/data/lean-project-*/LESSONS.md`), which survives plugin updates. Nothing leaves your machine.
+Lessons go to the plugin's data folder (`~/.claude/plugins/data/lean-project-*/LESSONS.md`), which survives plugin updates. Lessons never leave your machine. Delegated briefs stay local with the `llama` runner. With `opencode`, the brief goes to the OpenCode service and its free model.
 
 ## Credits
 

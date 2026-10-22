@@ -51,7 +51,7 @@ In Claude Code:
 /plugin install lean-project@lean-project
 ```
 
-Requires bash: built in on macOS and Linux, and Git Bash on Windows (which Claude Code uses there). Everything except delegation needs no other dependencies. Delegation needs `curl` and `node` (both in Git Bash on Windows), plus a running llama.cpp server or the OpenCode desktop app.
+Requires bash: built in on macOS and Linux, and Git Bash on Windows (which Claude Code uses there). Everything except delegation needs no other dependencies. Delegation needs `curl` and `node` (both in Git Bash on Windows), plus whichever local server or tool you pick: llama.cpp, Ollama, Unsloth Studio, the OpenCode desktop app, aider or goose. Only the one you choose has to be running.
 
 ## Delegating work
 
@@ -79,7 +79,7 @@ Requires bash: built in on macOS and Linux, and Git Bash on Windows (which Claud
 
    The answer is written to `answer.md`. Read it and verify it before using it. A brief with no context gets a generic answer, so include the excerpt or file the model should work on.
 
-**If a runner is down, the work falls back on its own.** Before each delegated job, `lean-project delegate run` tries the chosen runner, then the fallbacks in `fallback` (default `llama opencode`). A runner counts as down when the llama health check fails or the OpenCode CLI is missing. If every runner is down, the command exits with status 3 and Claude does the work itself. The session start prints which runner is in use right now.
+**If a runner is down, the work falls back on its own.** Before each delegated job, `lean-project delegate run` tries the chosen runner, then the fallbacks in `fallback` (default `llama opencode`, set with `fallback`). A runner counts as down when its health check fails (llama, Ollama, Unsloth) or its program is missing (OpenCode, aider, goose). If every runner is down, the command exits with status 3 and Claude does the work itself. The session start prints which runner is in use right now.
 
 Other runners, each set with `lean-project delegate set`:
 
@@ -128,8 +128,9 @@ The `lean-project` command is on Claude's PATH while the plugin is enabled (you 
 | `lean-project audit security [dir]` | Read-only scan of PHP and JS for WordPress anti-patterns (unescaped output, unprepared SQL, missing nonce or capability checks, dangerous functions) |
 | `lean-project handoff [docs/PLAN.md]` | Draft of the state file: branch, next tasks, cards in flight (prints only) |
 | `lean-project delegate config` | Show the project's delegation choice, or that none is set yet |
-| `lean-project delegate set <key> <value>` | Save a key in `.lean-project`: `runner` (`none`, `llama`, `opencode`), `llama_url`, `llama_model`, `opencode_cli`, `opencode_model` |
-| `lean-project delegate check` | Check the chosen runner answers (llama server up, OpenCode model listed) |
+| `lean-project delegate set <key> <value>` | Save a key in `.lean-project`: `runner` (`none`, `llama`, `ollama`, `unsloth`, `opencode`, `aider`, `goose`), `fallback`, `llama_url`, `llama_model`, `ollama_url`, `ollama_model`, `unsloth_url`, `unsloth_model`, `aider_model`, `opencode_cli`, `opencode_model` |
+| `lean-project delegate check` | Check whether the chosen runner is up, and which runners would be tried |
+| `lean-project delegate pick` | Print the runner in use right now (the first one up in the fallback order, or `none`) |
 | `lean-project delegate run <brief> <output>` | Send a brief to the runner and write the answer to a file |
 | `lean-project selftest` | Check the tool on this machine |
 

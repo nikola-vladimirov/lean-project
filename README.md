@@ -34,7 +34,7 @@ A Claude Code plugin that makes every session cheaper. Claude re-sends the whole
 
 **Delegation**
 
-- **Send bulk work elsewhere.** Each project chooses where delegated work goes: `none` (everything stays with Claude), `llama` (a local llama.cpp server) or `opencode` (free OpenCode models only). Bulk reading, code sweeps, fixtures and lint loops go there. Security, architecture and review stay with Claude.
+- **Send bulk work elsewhere.** Each project chooses where delegated work goes: `none` (everything stays with Claude), `llama` (a local llama.cpp server), `ollama`, `unsloth` (Unsloth Studio), `opencode` (free OpenCode models only), `aider` or `goose` (agent CLIs). Bulk reading, code sweeps, fixtures and lint loops go there. Security, architecture and review stay with Claude.
 - **Asked once per project.** The first session in a project, new-project setup and adoption each ask the choice, and it is saved in `.lean-project` at the project root.
 
 **Session hygiene**
@@ -78,6 +78,15 @@ Requires bash: built in on macOS and Linux, and Git Bash on Windows (which Claud
    ```
 
    The answer is written to `answer.md`. Read it and verify it before using it. A brief with no context gets a generic answer, so include the excerpt or file the model should work on.
+
+**If a runner is down, the work falls back on its own.** Before each delegated job, `lean-project delegate run` tries the chosen runner, then the fallbacks in `fallback` (default `llama opencode`). A runner counts as down when the llama health check fails or the OpenCode CLI is missing. If every runner is down, the command exits with status 3 and Claude does the work itself. The session start prints which runner is in use right now.
+
+Other runners, each set with `lean-project delegate set`:
+
+- **ollama:** `ollama_url` (default `http://127.0.0.1:11434`) and `ollama_model`, the model tag you pulled.
+- **unsloth:** `unsloth_url` (default `http://127.0.0.1:8888`, the port `unsloth studio -p` uses) and `unsloth_model`. Put the API key in the `UNSLOTH_API_KEY` environment variable, never in `.lean-project`.
+- **aider:** `aider_model`. Needs the `aider` command on the PATH. Aider and goose are agents that can edit files, so use them only where edits are wanted and review `git diff` afterwards.
+- **goose:** needs the `goose` command on the PATH. It runs with `goose run -i <brief>`.
 
 The llama default URL is `http://127.0.0.1:9931`. Change it with `lean-project delegate set llama_url <url>` if your server runs elsewhere. The model name for llama is set with `llama_model`.
 

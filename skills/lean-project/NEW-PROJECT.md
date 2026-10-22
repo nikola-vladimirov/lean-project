@@ -42,6 +42,10 @@ Unknowns become assumptions and decisions with defaults in the plan, so they nev
 
 If the folder is not a repository, offer `git init` with a `.gitignore` for the stack. Ask before creating any remote or pushing.
 
+## 4b. Delegation choice
+
+Ask once with AskUserQuestion, with the default first: none (do all work here), llama (the local llama.cpp server, for example yuxinlu1 gemma-4-12B-coder Q4_K_M), or opencode (free OpenCode models, default `opencode/deepseek-v4.1-flash-free`). Save it with `lean-project delegate set runner <value>`, then `lean-project delegate check`. The same question is asked on a project's first session, and for adopted projects in step 1 of "Adopting a project". Never pick a paid model for opencode.
+
 ## 5. Finish
 
 Run `lean-project toc` on docs of 80+ lines and `lean-project cost <project>`. Report the session-start tokens (auto-loaded plus the state file), list the open decisions the user should answer, and record a lesson.

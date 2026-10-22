@@ -56,6 +56,7 @@ Pass both with the Agent tool's `model` (`haiku`, `sonnet`, `opus`) and `effort`
 - **Writing tasks:** one at a time in the same checkout by default. Parallel writers only on disjoint files and only with `isolation: "worktree"` (needs git); the lead merges.
 - **A large independent piece** (hours of work): propose a separate session (`start_session`, `model` set, own worktree). Start it only when the user asked for separate or parallel work.
 - **Workflow tool:** only when the user says "use a workflow".
+- **Runner:** when the project's `.lean-project` runner is `llama` or `opencode`, bulk reading, code sweeps, fixtures and lint loops go to `lean-project delegate run <brief> <output>` instead of an Agent call. The lead reads the output file and verifies it. Security, architecture and review stay on Claude. When the runner is `none`, use the Agent calls above.
 - **Too small to delegate:** anything that takes fewer tool calls than writing its brief. Do it here.
 
 ## Brief (every delegated task)

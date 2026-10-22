@@ -378,7 +378,7 @@ cmd_selftest() {
   # audit security: each anti-pattern is flagged on its line; escaped output is not
   mkdir -p "$tmp/sec"
   printf '%s\n' '<?php' 'echo $_GET["x"];' 'echo esc_html($_GET["x"]);' '$wpdb->query("DELETE FROM t WHERE id = $id");' \
-    'eval($_POST["c"]);' 'add_action("wp_ajax_save", "save");' > "$tmp/sec/a.php"
+    'eval($code);' 'add_action("wp_ajax_save", "save");' > "$tmp/sec/a.php"
   sec=$(cmd_audit_security "$tmp/sec")
   echo "$sec" | grep -q 'a.php:2: request data echoed without escaping' || { echo "FAIL security missed unescaped output"; fail=1; }
   echo "$sec" | grep -q 'a.php:3: ' && { echo "FAIL security flagged escaped output"; fail=1; }

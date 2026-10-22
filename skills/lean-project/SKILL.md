@@ -7,7 +7,13 @@ description: Run a project with the fewest tokens per session. Start a new proje
 
 One goal: the fewest tokens a session spends to get oriented, stay oriented and get the work done, without losing information.
 
-**Always on.** This skill applies to every project and every task, whether or not the user names it. The session hook prints the standing rules at start. For WordPress, WooCommerce, Bricks and block-editor work it also points to `WORDPRESS.md`, and a change to that code is not done until `lean-project audit security <folder>` has been run and its findings fixed or explained.
+**Always on.** This skill applies to every project and every task, whether or not the user names it. The session hook prints the standing rules at start. For WordPress, WooCommerce, Bricks and block-editor work it also points to `WORDPRESS.md`, and a change to that code is not done until `lean-project audit security <edited files>` has been run and its findings fixed or explained.
+
+## Review scope (every mode, every project; mandatory)
+
+Code, performance, testing, security and similar reviews cover only the files this task edited. Take the list from the diff or from this task's own edits, review only those files, and report only findings in them. Run `lean-project audit security` on that list, not on the folder.
+
+A full-project review runs only when the user asks for it, or when the model suggests one for a huge change (many files, or a cross-cutting refactor). Suggest it in one line and wait for a yes. Never start one on your own.
 
 ## Pick the mode, read only its guide
 
@@ -66,7 +72,7 @@ Read the lessons file if it exists. Its "Local rules" section outranks the defau
 - `lean-project check gate <card> [files]`: `php -l` and, when installed, `phpcs` with the WordPress standard (or the project's own `phpcs.xml`). `board move <card> done` runs it on the card's files (`board files <card> <paths>` records them). A failure moves the card back to `todo` with the output on the card.
 - `lean-project audit waste [dir] [--apply]`: comment blocks of 8+ lines, debug `error_log()` calls and repeated hooks. Dry run by default. `--apply` (git repositories only) moves comment blocks verbatim into `docs/ARCHIVE.md`; debug logs and repeated hooks are reported only, since removing them changes behaviour.
 - `lean-project frontier [docs/PLAN.md]`: the decisions to ask next (status `open`, every `needs D#` already decided) and what waits on them.
-- `lean-project audit security [dir]`: read-only scan of PHP and JS for WordPress anti-patterns (unescaped output, SQL without `prepare`, handlers with no nonce or capability check, `eval`, request data stored without sanitizing, open REST routes, unchecked uploads). A heuristic: each line is a place to read. Fixes are in `WORDPRESS.md`.
+- `lean-project audit security [dir or files...]`: pass the edited files (the review scope rule); a folder scans all of it. Read-only scan of PHP and JS for WordPress anti-patterns (unescaped output, SQL without `prepare`, handlers with no nonce or capability check, `eval`, request data stored without sanitizing, open REST routes, unchecked uploads). A heuristic: each line is a place to read. Fixes are in `WORDPRESS.md`.
 - `lean-project handoff [docs/PLAN.md]`: prints a draft of the state file (branch, next open tasks, cards in flight) for review. It writes nothing; paste the reviewed draft into the state file before a reset.
 - `lean-project lesson "<text>" [--mode M] [--project P]` and `lean-project lessons`: record a lesson; the second sighting of the same text becomes a line under "Local rules" and its entries move to `LESSONS-ARCHIVE.md`.
 - `lean-project selftest`.

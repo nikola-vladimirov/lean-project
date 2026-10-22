@@ -14,7 +14,7 @@
 #   lean-project frontier [docs/PLAN.md]      decisions to ask now (open, prerequisites decided) and what waits on them
 #   lean-project lesson "<text>" [--project P] [--mode M]   record a lesson; a second sighting becomes a local rule
 #   lean-project lessons                      the local rules and the lessons file
-#   lean-project audit security [dir]    WordPress anti-patterns in PHP and JS (unescaped output, unprepared SQL, missing nonce or capability checks)
+#   lean-project audit security [dir or files...]  WordPress anti-patterns in PHP and JS (unescaped output, unprepared SQL, missing nonce or capability checks); files = edited files only
 #   lean-project handoff [docs/PLAN.md]  draft of the state file: branch, next tasks, cards in flight (prints only)
 #   lean-project delegate config | set <key> <value> | check | run <brief> <output>   route bulk work to the project's runner (none, llama, opencode)
 #   lean-project selftest                check the tool on this machine
@@ -728,11 +728,17 @@ SEC_AWK='
   }'
 
 # Audit security: read-only scan of PHP and JS for the WordPress anti-patterns in SEC_AWK, one line per finding.
+# Give a folder to scan all of it, or the edited files to scan only those (the review scope rule).
 cmd_audit_security() {
   local dir="${1:-.}" f rel lang out files
-  [ -d "$dir" ] || die "audit security: $dir is not a folder"
-  dir=$(cd "$dir" && pwd -P)
-  files=$(find_files "$dir" \( -name '*.php' -o -name '*.js' \) | sort)
+  if [ -f "$1" ]; then
+    files=$(printf '%s\n' "$@" | grep -E '\.(php|js)$' | sort -u)
+    dir=$(pwd -P)
+  else
+    [ -d "$dir" ] || die "audit security: $dir is not a folder"
+    dir=$(cd "$dir" && pwd -P)
+    files=$(find_files "$dir" \( -name '*.php' -o -name '*.js' \) | sort)
+  fi
   out=$(while IFS= read -r f; do
     [ -n "$f" ] || continue
     rel="${f#"$dir"/}"
@@ -877,7 +883,7 @@ case "$cmd" in
     case "${1:-}" in
       waste) shift; cmd_waste "$@" ;;
       security) shift; cmd_audit_security "$@" ;;
-      *) die "audit: 'audit waste [dir] [--apply]' or 'audit security [dir]'" ;;
+      *) die "audit: 'audit waste [dir] [--apply]' or 'audit security [dir or files...]'" ;;
     esac ;;
   frontier) cmd_frontier "$@" ;;
   lesson) cmd_lesson "$@" ;;

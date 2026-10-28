@@ -755,10 +755,14 @@ EOF
 }
 
 # Performance and HPOS scan: runs scripts/scan.sh of the wp-woo-performance-audit skill (its own public repo).
-# Looks in $WP_PERF_AUDIT_HOME, then the user's skills folder. Read-only.
+# Looks in $WP_PERF_AUDIT_HOME, then the installed plugin (newest version), then the user's skills folder. Read-only.
 cmd_audit_perf() {
-  local home="${WP_PERF_AUDIT_HOME:-$HOME/.claude/skills/wp-woo-performance-audit}"
-  [ -f "$home/scripts/scan.sh" ] || { echo "audit perf: the wp-woo-performance-audit skill is not at $home. Install it from github.com/nikola-vladimirov/wp-woo-performance-audit into ~/.claude/skills, or set WP_PERF_AUDIT_HOME." >&2; return 1; }
+  local home="${WP_PERF_AUDIT_HOME:-}" d
+  if [ -z "$home" ]; then
+    d=$(ls -1d "$HOME"/.claude/plugins/cache/wp-woo-performance-audit/*/*/skills/wp-woo-performance-audit 2>/dev/null | sort -V | tail -n 1)
+    home=${d:-$HOME/.claude/skills/wp-woo-performance-audit}
+  fi
+  [ -f "$home/scripts/scan.sh" ] || { echo "audit perf: the wp-woo-performance-audit skill is not at $home. Install it with /plugin install wp-woo-performance-audit@wp-woo-performance-audit, or set WP_PERF_AUDIT_HOME." >&2; return 1; }
   bash "$home/scripts/scan.sh" "$@"
 }
 

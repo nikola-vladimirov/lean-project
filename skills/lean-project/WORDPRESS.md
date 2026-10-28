@@ -113,5 +113,6 @@ After each fix, re-run `lean-project audit security <edited files>` and confirm 
 - The plan or card records the versions checked and the docs used (section 1), with URLs or file references.
 - The changelog check (section 2) is written down: minimum WordPress, PHP, WooCommerce and Bricks versions.
 - `lean-project audit security <edited files>` has been run and every finding was either fixed or explained in the card.
+- For WordPress or WooCommerce performance or HPOS risk, `lean-project audit perf <edited files>` has been run; CRITICAL hits are fixed or explained before the card is `done`. Deeper audits go to the `wp-woo-performance-audit` skill.
 - `php -l` and `lean-project check gate <card>` pass for the changed PHP files.
 - For Bricks, WooCommerce checkout or block changes, the change has been tested in the real builder or site, not only in a mock (see the project's own testing rules).

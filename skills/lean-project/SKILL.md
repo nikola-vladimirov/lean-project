@@ -24,7 +24,8 @@ A full-project review runs only when the user asks for it, or when the model sug
 | Sharpen a fuzzy change, feature or design in an existing project | `GRILL.md` (with docs) |
 | Organize, audit or trim docs, CLAUDE.md, memory or handoffs | `DOCS.md` |
 | Build from the plan (a phase, a feature, a release) | `BUILD.md` |
-| Work on a live client website (approvals, drafts, backups, CDN, copy, tokens) | `CLIENT-SITE.md`, then `WORDPRESS.md` for any code change |
+| Work on a live client website (approvals, drafts, backups, CDN, tokens) | `CLIENT-SITE.md`, then `WORDPRESS.md` for any code change |
+| Write or edit website text (product pages, guides, blog, FAQ) | `SITE-COPY.md` (method), plus the project's voice notes |
 | Build or review WordPress, WooCommerce, Bricks or block-editor code (plugin, theme, companion script) | `WORDPRESS.md`: how to read the docs, check changelogs, best practices, the security checklist and fixes. Read it before changing that code, every time. |
 | Audit a WordPress or WooCommerce site or codebase for performance, HPOS or layout, onboard an inherited store, or triage a slow store | The `wp-woo-performance-audit` skill (its own public repo, installed in `~/.claude/skills`). Scope: the edited files for a card; the whole folder only for an audit the user asked for. Its scan is `lean-project audit perf`. |
 | Build or change a Bricks or BricksExtras site, page, template, element, query or condition | `builder/INDEX.md`, then only the one `builder/<skill>/SKILL.md` the task needs |

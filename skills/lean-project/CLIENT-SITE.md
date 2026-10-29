@@ -34,11 +34,7 @@ Read-only only: active theme and its parent, active plugins with versions, trans
 
 ## 4. Copy for a client site
 
-- Every factual claim traces to a product page, a document or a cited source, read in the session. No guessed, rounded, or plausible-looking figures. A gap is reported, not filled.
-- Blog figures are checked against the product page; the product page wins on conflict.
-- Source language first; translations come from the site's translation plugin, not hand translation.
-- No em dashes, emoji, or hidden symbols in new text. No inflated filler.
-- Write the figures and sources in working notes, not in the copy.
+Follow `SITE-COPY.md` (fact-check first, the house forbidden list, the human-writing check). The project's own voice notes and product facts sit in its docs folder and are read per task.
 
 ## 5. Tools and tokens
 

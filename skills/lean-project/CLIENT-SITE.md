@@ -38,6 +38,8 @@ Follow `SITE-COPY.md` (fact-check first, the house forbidden list, the human-wri
 
 ## 5. Tools and tokens
 
+Model and tool choice for every task follows `ROUTING.md` (mandatory). Design work on a client site uses `ui-ux-pro-max` before any build, and TokenForge once it is installed and approved.
+
 - Read the map of a file, then only the lines needed (`lean-project map`, grep).
 - Filter large output before it enters the conversation.
 - Bulk reads (more than about 5 files, big logs, big discovery results) go to a subagent that returns only the answer.

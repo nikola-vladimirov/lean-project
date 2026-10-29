@@ -7,7 +7,7 @@ description: Run a project with the fewest tokens per session. Start a new proje
 
 One goal: the fewest tokens a session spends to get oriented, stay oriented and get the work done, without losing information.
 
-**Always on.** This skill applies to every project and every task, whether or not the user names it. Starting or adopting any project runs the mandatory setup cards in `STARTUP.md` first, before any plan, code or site change. The session hook prints the standing rules at start. For WordPress, WooCommerce, Bricks and block-editor work it also points to `WORDPRESS.md`, and a change to that code is not done until `lean-project audit security <edited files>` has been run and its findings fixed or explained.
+**Always on.** This skill applies to every project and every task, whether or not the user names it. Before any task starts, choose the model for each part and the tool or plugin for the work, as set out in `ROUTING.md`. This is mandatory. Starting or adopting any project runs the mandatory setup cards in `STARTUP.md` first, before any plan, code or site change. The session hook prints the standing rules at start. For WordPress, WooCommerce, Bricks and block-editor work it also points to `WORDPRESS.md`, and a change to that code is not done until `lean-project audit security <edited files>` has been run and its findings fixed or explained.
 
 ## Review scope (every mode, every project; mandatory)
 
@@ -26,6 +26,7 @@ A full-project review runs only when the user asks for it, or when the model sug
 | Build from the plan (a phase, a feature, a release) | `BUILD.md` |
 | Work on a live client website (approvals, drafts, backups, CDN, tokens) | `CLIENT-SITE.md`, then `WORDPRESS.md` for any code change |
 | Write or edit website text (product pages, guides, blog, FAQ) | `SITE-COPY.md` (method), plus the project's voice notes |
+| Any task at all (routing, which model and which tool or plugin) | `ROUTING.md`, before starting |
 | Build or review WordPress, WooCommerce, Bricks or block-editor code (plugin, theme, companion script) | `WORDPRESS.md`: how to read the docs, check changelogs, best practices, the security checklist and fixes. Read it before changing that code, every time. |
 | Audit a WordPress or WooCommerce site or codebase for performance, HPOS or layout, onboard an inherited store, or triage a slow store | The `wp-woo-performance-audit` skill (its own public repo, installed in `~/.claude/skills`). Scope: the edited files for a card; the whole folder only for an audit the user asked for. Its scan is `lean-project audit perf`. |
 | Build or change a Bricks or BricksExtras site, page, template, element, query or condition | `builder/INDEX.md`, then only the one `builder/<skill>/SKILL.md` the task needs |

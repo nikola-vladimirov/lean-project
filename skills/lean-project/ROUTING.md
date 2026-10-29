@@ -1,0 +1,39 @@
+# Routing: model and tool choice (mandatory)
+
+Before any task starts, decide two things and write them in one line in the reply: **who does each part** (model) and **which tool or plugin** (skill, plugin or MCP). This applies to every task, including reviews and short edits. Skipping it is a defect.
+
+## 1. Model routing
+
+| Job | Route |
+|---|---|
+| Bulk reads, searches, summaries, first drafts of routine text or code | Sonnet at medium effort, or a free OpenCode model (`-free`) that has passed a trial on this kind of task |
+| Planning, decisions, approvals, final edits to client-facing work | The main session |
+| Review of every Sonnet or OpenCode output before it is used | Opus at high effort |
+
+- Effort is set per task by how important it is. Paid models: at least medium. Free models: at least extra high.
+- Free models: probe a few on small trial tasks, keep the one that passes, and prefer it. Only `-free` models.
+- A worker's output is not used until the reviewer signs it off and the task's acceptance checks pass.
+- Log the routing line (job, model, effort) in the handoff for the session.
+
+## 2. Tool and plugin choice
+
+Pick the tool that matches the work. Load its schema only when the task needs it.
+
+| Work | Tool or skill |
+|---|---|
+| Any UI, layout, visual design, component or page design | `ui-ux-pro-max` (`--design-system` for a new page or system, then `--domain ux` for a focused concern). Read its rules before designing. |
+| Styling for a site where TokenForge is the target | TokenForge (non-WordPress.org build) once installed; check whether the site already uses it. Until it is installed and approved, use the site's existing styles. |
+| WordPress, WooCommerce, Bricks or block-editor code | `WORDPRESS.md` and the matching `wp-*` skill (security, REST, blocks, theme, WooCommerce). Run `lean-project audit security` on edited files. |
+| Bricks or BricksExtras elements, templates, queries, conditions | The `bricks-*` and `bricksextras-*` skills for the element in question, read through `bricks/get-element-schema` where needed. |
+| Client website text | `SITE-COPY.md` and the project's voice notes. |
+| Live site reads or writes | The site's MCP abilities first; SSH only where the abilities cannot do it (`CLIENT-SITE.md`). |
+| Performance audit of a WordPress or WooCommerce codebase | `wp-woo-performance-audit` (`lean-project audit perf`). |
+
+- If the right tool is not installed, say so and propose the install with its backup step; do not improvise a substitute silently.
+- Plugin installs on a live site need a database backup and the owner's approval first, per `CLIENT-SITE.md`.
+
+## 3. Where it is written down
+
+- The project index lists the routing rules that apply to it.
+- The handoff logs each task's routing line.
+- Session-start check: if a task starts without a routing line, stop and write one first.

@@ -29,4 +29,8 @@ fi
 if [ ! -f .lean-project ] && { [ -f CLAUDE.md ] || [ -d docs ] || [ -f README.md ]; }; then
   echo "lean-project: no delegation choice for this project yet. Ask the user once with AskUserQuestion: none (do all work here), llama (llama.cpp server), ollama, unsloth (Unsloth Studio), opencode (free OpenCode models), aider or goose (agent CLIs). Then run: lean-project delegate set runner <value>, and check it with lean-project delegate check. A runner that is down falls back in order, and then Claude does the work."
 fi
+# Setup check: a project with docs or a git repo, but no recorded startup setup, gets the mandatory cards.
+if [ ! -f .lean-project-setup ] && { [ -d docs ] || [ -d .git ]; }; then
+  echo "lean-project setup not recorded for this project. Before any plan, code or site change, run the startup cards in ${CLAUDE_PLUGIN_ROOT:-.}/skills/lean-project/STARTUP.md. For a project that already exists, follow NEW-PROJECT.md, "Adopting a project", and pre-fill each card from what you read. Record the setup in .lean-project-setup (date and new or adopted) when the cards are answered."
+fi
 exit 0

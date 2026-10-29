@@ -4,6 +4,14 @@ Run this at the start of every new project and every adoption, before any build.
 
 Record every answer as a D# row in `docs/PLAN.md` the moment it is given. Keep the cards short; put the reasoning in the option descriptions.
 
+## Adopting an existing project: read first, then pre-fill
+
+For a project that already exists, do the read-only discovery in `NEW-PROJECT.md` ("Adopting a project", step 1) before the first card. Then:
+
+- **Pre-fill, do not ask blank.** When the evidence answers a card, make that answer the recommended option and say where it came from ("Found: Bricks 2.4.4 on the live host. Confirm?"). Ask blank only when nothing shows the answer.
+- **Never overwrite.** Existing index, state file, docs and decision records are kept. Only missing pieces are added, and replaced text moves verbatim to an archive file.
+- **Evidence sources, read-only:** the index and state file, the git log (a range), the code map, the server (read-only checks), the plugin or theme headers, the live product or site pages.
+
 ## Round 1, every project (always)
 
 1. **Project type:** website (live or building), WordPress plugin, web app, other.
@@ -42,4 +50,5 @@ Record every answer as a D# row in `docs/PLAN.md` the moment it is given. Keep t
 - Write the answers into `docs/PLAN.md` as D# rows (status `decided` or `open`).
 - Write `docs/STACK.md` from read-only checks, for websites and plugins that have a running site.
 - Write `CLAUDE.md` (index) and `docs/HANDOFF.md`.
+- Write `.lean-project-setup` at the project root: a date, and "new" or "adopted". The session-start hook reads it, and reminds the next session until it exists.
 - Show the user a one-table summary of the decisions and any `open` items. Ask only for the open ones.

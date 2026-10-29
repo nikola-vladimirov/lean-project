@@ -58,6 +58,7 @@ Run `lean-project toc` on docs of 80+ lines and `lean-project cost <project>`. R
 
 For a project already under way: code, history and docs exist, but no phased plan. The plan is reconstructed, not invented, and existing files are never replaced.
 
+0. **Pre-fill the startup cards.** Steps 1 and 2 give the evidence; `STARTUP.md` turns it into recommended answers ("Adopting an existing project"). Ask only the blank ones.
 1. **Read what exists, cheaply:** the index and state file (whatever names the project uses), `git tag` and `git log --oneline` (a range, not the whole history), the changelog's recent window, and the code through the graph tool or `lean-project map <dir>`. A haiku subagent does any bulk reading and returns a summary.
 2. **Keep the project's layout.** Its index, state file, doc names and docs folder stay (see "Docs folder" in SKILL.md). Only missing pieces are added: the plan from `templates/PLAN.md`, a state file if there is none. An oversized or duplicated index or state file is a job for `DOCS.md`, run after this.
 3. **Write the plan from the evidence:**

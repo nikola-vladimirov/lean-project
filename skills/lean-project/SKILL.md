@@ -7,7 +7,7 @@ description: Run a project with the fewest tokens per session. Start a new proje
 
 One goal: the fewest tokens a session spends to get oriented, stay oriented and get the work done, without losing information.
 
-**Always on.** This skill applies to every project and every task, whether or not the user names it. The session hook prints the standing rules at start. For WordPress, WooCommerce, Bricks and block-editor work it also points to `WORDPRESS.md`, and a change to that code is not done until `lean-project audit security <edited files>` has been run and its findings fixed or explained.
+**Always on.** This skill applies to every project and every task, whether or not the user names it. Starting or adopting any project runs the mandatory setup cards in `STARTUP.md` first, before any plan, code or site change. The session hook prints the standing rules at start. For WordPress, WooCommerce, Bricks and block-editor work it also points to `WORDPRESS.md`, and a change to that code is not done until `lean-project audit security <edited files>` has been run and its findings fixed or explained.
 
 ## Review scope (every mode, every project; mandatory)
 
@@ -19,8 +19,8 @@ A full-project review runs only when the user asks for it, or when the model sug
 
 | The user wants to | Read |
 |---|---|
-| Start a new project | `NEW-PROJECT.md` (it sends loose ideas through `GRILL.md`) |
-| Take over a project already under way that has no phased plan | `NEW-PROJECT.md`, "Adopting a project" |
+| Start a new project | `STARTUP.md` first (mandatory setup cards), then `NEW-PROJECT.md` (loose ideas go through `GRILL.md`) |
+| Take over a project already under way that has no phased plan | `STARTUP.md` first (mandatory setup cards), then `NEW-PROJECT.md`, "Adopting a project" |
 | Sharpen a fuzzy change, feature or design in an existing project | `GRILL.md` (with docs) |
 | Organize, audit or trim docs, CLAUDE.md, memory or handoffs | `DOCS.md` |
 | Build from the plan (a phase, a feature, a release) | `BUILD.md` |

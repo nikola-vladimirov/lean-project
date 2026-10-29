@@ -2,6 +2,10 @@
 
 Goal: a project any fresh session can pick up for about 1 to 2k tokens: a short index, a plan with gates, a state file. Nothing else until the project needs it.
 
+## 0. Mandatory startup
+
+Before anything else, run the startup cards in `STARTUP.md`. This applies to every new project and every adoption, with no exceptions. Its answers become the D# rows the rest of this guide writes into the plan.
+
 ## 1. Ask once, or grill
 
 **Loosely described** (an idea or a one-liner, or the user cannot yet say what done looks like, who it is for, or what the main pieces are): read `GRILL.md` and follow it instead of the single round below. Its settled decisions feed the plan in step 3.
